@@ -20,6 +20,7 @@ export async function maybeNightlyReset() {
     await resetLiveTables(d);
     await d.query(`DELETE FROM handoffs WHERE created_at < now() - interval '7 days'`);
     await d.query(`DELETE FROM feedback WHERE created_at < now() - interval '30 days'`);
+    await d.query(`DELETE FROM staff_flags WHERE created_at < now() - interval '30 days'`);
   } finally {
     await d.query(`SELECT pg_advisory_unlock(424242)`);
   }

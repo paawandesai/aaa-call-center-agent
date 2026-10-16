@@ -31,6 +31,7 @@ for (const [i, turns] of scripts.entries()) {
     let text = "";
     const r = await runTurn(deps, c, t, (e) => {
       if (e.type === "text_delta") text += e.text;
+      else if (e.type === "text_discard") text = text.slice(0, text.length - e.chars);
       else console.log(`  [${e.type}] ${JSON.stringify(e).slice(0, 260)}`);
     });
     console.log(`  text: ${text}`);

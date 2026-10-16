@@ -8,6 +8,8 @@ export const HandoffReasonSchema = z.enum(["safety", "billing_account", "cancel_
 export const AgentEvent = z.discriminatedUnion("type", [
   z.object({ type: z.literal("status"), phase: z.enum(["searching_kb", "checking_availability", "booking"]) }),
   z.object({ type: z.literal("text_delta"), text: z.string() }),
+  // Drop the last `chars` characters of streamed text: words written just before a tool call are not meant for the caller.
+  z.object({ type: z.literal("text_discard"), chars: z.number().int().nonnegative() }),
   z.object({ type: z.literal("sources"), sources: z.array(z.object({ doc_title: z.string(), effective_date: z.string().nullable(), section: z.string() })).max(3) }),
   z.object({ type: z.literal("slots"), slots: z.array(Slot).max(4) }),
   z.object({ type: z.literal("confirm_request"), service: z.string(), slot_id: z.number().int(), when_label: z.string(), zip: z.string(), name: z.string(), fee_label: z.string() }),

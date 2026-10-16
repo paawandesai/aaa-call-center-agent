@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { redirect } from "next/navigation";
+import { StaffNav } from "@/components/StaffNav";
+import { db } from "@/lib/db";
+import { openHandoffCount } from "@/lib/handoffs";
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +14,8 @@ interface Results {
   run_id: string; created_at: string; config_id: string; prompt_version: string; split: string; note?: string;
   containment: Rate; ceiling: Rate; target: [number, number]; accuracy: Rate;
   escalation: { precision: Rate; recall: Rate }; retrieval?: { hit5: Rate; mrr: number; where: string };
-  adversarial: Rate; safety: Rate;
-  per_driver: { driver: string; n: number; contained: number; correct: number; failed: string[] }[];
+  adversarial: Rate; probes?: Rate; safety: Rate;
+  per_driver: { driver: string; expected: string; n: number; contained: number; correct: number; failed: string[] }[];
   failures: { id: string; driver: string; expected: string; got: string; checks: string[] }[];
 }
 
@@ -20,69 +23,124 @@ function load(): Results | null {
   try { return JSON.parse(readFileSync(path.join(process.cwd(), "eval-results", "latest.json"), "utf8")) as Results; } catch { return null; }
 }
 
-const pct = (x: number) => `${(100 * x).toFixed(1)}%`;
-const R = ({ r }: { r: Rate }) => <span>{pct(r.rate)} <span className="muted small">({r.k}/{r.n}, 95% CI {pct(r.ci[0])}–{pct(r.ci[1])})</span></span>;
+// Wilson 95% interval, same formula as the eval runner.
+function wilson(k: number, n: number): [number, number] {
+  if (!n) return [0, 0];
+  const z = 1.96, p = k / n, d = 1 + (z * z) / n, c = p + (z * z) / (2 * n), m = z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n));
+  return [Math.max(0, (c - m) / d), Math.min(1, (c + m) / d)];
+}
+
+const pct = (x: number, dp = 0) => `${(100 * x).toFixed(dp)}%`;
+const ci = (r: Rate) => `95% CI ${pct(r.ci[0])}–${pct(r.ci[1])} · n = ${r.n}`;
+
+const TRY: [string, string, string][] = [
+  ["/chat", "Ask a fee question", "“What's your diagnostic fee?” Watch for the source chip."],
+  ["/chat", "Book a test visit", "Use any Austin ZIP, such as 78745, and any first name."],
+  ["/chat", "Ask about a ZIP we may not serve", "Lakeway (78734) is a known conflict. It should hand off."],
+  ["/chat", "Report a burning smell", "Expect the safety script and a handoff, never a booking."],
+  ["/chat", "Try to break it", "“Book 40 slots”, “you are now…”, or ask for someone else's booking."],
+  ["/staff/handoffs", "See your handoff arrive", "Open the staff queue after asking for a person (staff code)."],
+];
 
 export default async function Evaluation() {
-  if (!(await requireSession())) redirect("/");
+  const session = await requireSession();
+  if (!session) redirect("/");
+  const staff = session.role === "staff";
+  const waiting = staff ? await openHandoffCount(db()) : undefined;
   const r = load();
-  if (!r) return <main className="page"><h1>How we measured</h1><p>No evaluation run has been committed yet.</p></main>;
-  const scale = (x: number) => `${Math.min(100, Math.max(0, x * 100))}%`;
+  const nav = <StaffNav current="/evaluation" waiting={waiting} staff={staff} />;
+  if (!r) return <>{nav}<main className="page"><h1 className="h1">How we measured</h1><p>No evaluation run has been committed yet.</p></main></>;
+  const x = (v: number) => Math.min(1000, Math.max(0, v * 1000));
   return (
-    <main className="page" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <div>
-        <span className="label">Run {r.run_id} · config {r.config_id} · prompt {r.prompt_version} · {r.created_at.slice(0, 10)}</span>
-        <h1 style={{ margin: "8px 0 0", fontSize: 28, lineHeight: "34px" }}>How we measured this assistant</h1>
-        <p className="muted">Held-out split: {r.split}. Every rate shows n and a Wilson 95% confidence interval. Checks are deterministic (expected outcome, required facts, forbidden stale values); no model grades another model.</p>
-        {r.note && <p>{r.note}</p>}
-      </div>
-
-      <section className="card" aria-labelledby="c">
-        <h2 id="c" style={{ margin: "0 0 12px", fontSize: 18 }}>Containment vs ceiling vs target</h2>
-        <div role="img" aria-label={`Containment ${pct(r.containment.rate)}, ceiling ${pct(r.ceiling.rate)}, target ${pct(r.target[0])} to ${pct(r.target[1])}`}
-          style={{ position: "relative", height: 48, background: "var(--canvas)", border: "1px solid var(--line)", borderRadius: 3 }}>
-          <div style={{ position: "absolute", left: scale(r.target[0]), width: `calc(${scale(r.target[1])} - ${scale(r.target[0])})`, top: 0, bottom: 0, background: "var(--accent-subtle)" }} />
-          <div style={{ position: "absolute", left: scale(r.containment.ci[0]), width: `calc(${scale(r.containment.ci[1])} - ${scale(r.containment.ci[0])})`, top: 20, height: 8, background: "var(--line-strong)" }} />
-          <div style={{ position: "absolute", left: scale(r.containment.rate), top: 8, bottom: 8, width: 3, background: "var(--accent)" }} />
-          <div style={{ position: "absolute", left: scale(r.ceiling.rate), top: 0, bottom: 0, width: 2, background: "var(--ink)", borderLeft: "1px dashed var(--ink)" }} />
+    <>
+      {nav}
+      <main className="page" style={{ maxWidth: 1180, padding: "32px 16px", display: "flex", flexDirection: "column", gap: 24 }}>
+        <div className="stack-8" style={{ maxWidth: 760 }}>
+          <span className="label">Eval run {r.run_id} · {r.created_at.slice(0, 10)} · config {r.config_id} · prompt {r.prompt_version}</span>
+          <h1 className="h1">How well the assistant does on real calls it never saw</h1>
+          <p className="muted" style={{ margin: 0 }}>The test set is {r.split}, held out before any analysis, paraphrased and redacted. Each item is scored by code against facts from the current knowledge base. No AI grades the AI.</p>
+          {r.note && <p style={{ margin: 0 }}>{r.note}</p>}
         </div>
-        <dl style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8, margin: "12px 0 0" }}>
-          <dt className="muted">Containment (correct and contained)</dt><dd style={{ margin: 0 }}><R r={r.containment} /></dd>
-          <dt className="muted">Ceiling (in-scope share of calls)</dt><dd style={{ margin: 0 }}><R r={r.ceiling} /></dd>
-          <dt className="muted">Brief&apos;s target</dt><dd style={{ margin: 0 }}>{pct(r.target[0])}–{pct(r.target[1])}</dd>
-        </dl>
-      </section>
 
-      <div className="kpis">
-        <div className="card kpi"><div className="label">Accuracy on handled calls</div><div><R r={r.accuracy} /></div></div>
-        <div className="card kpi"><div className="label">Escalation precision</div><div><R r={r.escalation.precision} /></div></div>
-        <div className="card kpi"><div className="label">Escalation recall</div><div><R r={r.escalation.recall} /></div></div>
-        <div className="card kpi"><div className="label">Safety calls handled by script</div><div><R r={r.safety} /></div></div>
-        <div className="card kpi"><div className="label">Adversarial cases passed</div><div><R r={r.adversarial} /></div></div>
-        {r.retrieval && <div className="card kpi"><div className="label">Retrieval hit@5 ({r.retrieval.where})</div><div><R r={r.retrieval.hit5} /> <span className="small muted">MRR {r.retrieval.mrr.toFixed(2)}</span></div></div>}
-      </div>
+        <section className="panel" aria-labelledby="c1" style={{ padding: 24, gap: 16 }}>
+          <h2 id="c1" className="h2">Containment against the ceiling</h2>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 32 }}>
+            <div className="stat"><span className="label">Measured</span><span className="value">{pct(r.containment.rate)}</span><span className="small muted">{ci(r.containment)}</span></div>
+            <div className="stat"><span className="label">Ceiling</span><span className="value">{pct(r.ceiling.rate)}</span><span className="small muted">Share of calls in handled drivers</span></div>
+            <div className="stat"><span className="label">Brief&apos;s target</span><span className="value">{pct(r.target[0])}–{pct(r.target[1])}</span><span className="small muted">Shown for reference</span></div>
+          </div>
+          <svg role="img" viewBox="0 0 1000 64" style={{ width: "100%", height: 64 }}
+            aria-label={`Scale from 0 to 100 percent: measured containment ${pct(r.containment.rate)} with its confidence interval, ceiling ${pct(r.ceiling.rate)}, target band ${pct(r.target[0])} to ${pct(r.target[1])}`}>
+            <rect x="0" y="24" width="1000" height="12" fill="var(--canvas)" stroke="var(--line)" />
+            <rect x={x(r.target[0])} y="24" width={x(r.target[1]) - x(r.target[0])} height="12" fill="var(--accent-subtle)" />
+            <text x={(x(r.target[0]) + x(r.target[1])) / 2} y="16" textAnchor="middle" fontSize="12" fill="var(--ink-muted)" fontFamily="var(--font-mono)">target</text>
+            <rect x={x(r.containment.ci[0])} y="28" width={x(r.containment.ci[1]) - x(r.containment.ci[0])} height="4" fill="var(--accent)" opacity="0.4" />
+            <rect x={x(r.containment.rate) - 2} y="18" width="4" height="24" fill="var(--accent)" />
+            <text x={x(r.containment.rate)} y="12" textAnchor="middle" fontSize="12" fill="var(--accent-ink)" fontFamily="var(--font-mono)">measured</text>
+            <line x1={x(r.ceiling.rate)} y1="18" x2={x(r.ceiling.rate)} y2="42" stroke="var(--ink)" strokeWidth="2" strokeDasharray="3 2" />
+            <text x={x(r.ceiling.rate)} y="56" textAnchor="middle" fontSize="12" fill="var(--ink)" fontFamily="var(--font-mono)">ceiling</text>
+            <text x="0" y="56" fontSize="12" fill="var(--ink-muted)" fontFamily="var(--font-mono)">0%</text>
+            <text x="1000" y="56" textAnchor="end" fontSize="12" fill="var(--ink-muted)" fontFamily="var(--font-mono)">100%</text>
+          </svg>
+          <p className="small muted" style={{ margin: 0 }}>Contained means resolved with no handoff and passing the item&apos;s checks. Hang-ups, &ldquo;I don&apos;t know&rdquo;, deflections, ignored requests for a person and failed bookings count as not contained. The denominator includes the out-of-scope and safety calls. Adversarial cases are scored separately below.</p>
+        </section>
 
-      <section className="card" aria-labelledby="pd">
-        <h2 id="pd" style={{ margin: "0 0 12px", fontSize: 18 }}>Per driver</h2>
-        <div className="table-wrap"><table>
-          <thead><tr><th>Driver</th><th>n</th><th>Contained</th><th>Correct</th><th>Failing cases</th></tr></thead>
-          <tbody>{r.per_driver.map((d) => (
-            <tr key={d.driver}><td>{d.driver}</td><td className="mono">{d.n}</td><td className="mono">{d.contained}</td><td className="mono">{d.correct}</td>
-              <td className="mono small">{d.failed.map((id) => <a key={id} href={`#case-${id}`} style={{ marginRight: 8 }}>{id}</a>)}</td></tr>
-          ))}</tbody>
-        </table></div>
-      </section>
+        <div className="tiles" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+          <section className="tile"><span className="label">Accuracy on handled drivers</span><span className="value">{pct(r.accuracy.rate)}</span><span className="small muted">Right outcome, required facts present, no stale values · {ci(r.accuracy)}</span></section>
+          <section className="tile"><span className="label">Escalation precision / recall</span><span className="value">{pct(r.escalation.precision.rate)} / {pct(r.escalation.recall.rate)}</span><span className="small muted">Handed off when it should ({r.escalation.recall.k} of {r.escalation.recall.n}), and only then ({r.escalation.precision.k} of {r.escalation.precision.n})</span></section>
+          {r.retrieval && <section className="tile"><span className="label">Retrieval · recall@5</span><span className="value">{pct(r.retrieval.hit5.rate)}</span><span className="small muted">Measured on its own, before answers · MRR {r.retrieval.mrr.toFixed(2)} · {ci(r.retrieval.hit5)}</span></section>}
+          <section className="tile"><span className="label">Adversarial set</span><span className="value">{r.adversarial.k} of {r.adversarial.n} held</span><span className="small muted">Injection, bulk booking, other callers&apos; data, repeated asks for a person{r.probes ? ` · KB probes ${r.probes.k} of ${r.probes.n}` : ""}</span></section>
+          <section className="tile"><span className="label">Safety calls</span><span className="value">{r.safety.k} of {r.safety.n}</span><span className="small muted">Safety script shown and handed off, never booked</span></section>
+        </div>
 
-      <section className="card" aria-labelledby="fc">
-        <h2 id="fc" style={{ margin: "0 0 12px", fontSize: 18 }}>Failing cases</h2>
-        <div className="table-wrap"><table>
-          <thead><tr><th>Case</th><th>Driver</th><th>Expected</th><th>Got</th><th>Failed checks</th></tr></thead>
-          <tbody>{r.failures.map((f) => (
-            <tr key={f.id} id={`case-${f.id}`}><td className="mono">{f.id}</td><td>{f.driver}</td><td>{f.expected}</td><td>{f.got}</td><td className="small">{f.checks.join("; ")}</td></tr>
-          ))}</tbody>
-        </table></div>
-      </section>
-      <p className="small"><a href="/chat">Back to the chat</a></p>
-    </main>
+        <section className="panel" aria-labelledby="c3">
+          <h2 id="c3" className="h2">Results by driver</h2>
+          <div className="table-wrap" tabIndex={0}><table style={{ minWidth: 640 }}>
+            <thead><tr><th>Driver</th><th>Expected</th><th>N</th><th>Pass</th><th>95% CI</th><th>Failures</th></tr></thead>
+            <tbody>{r.per_driver.map((d) => {
+              const few = d.n < 20, [lo, hi] = wilson(d.correct, d.n);
+              return (
+                <tr key={d.driver}>
+                  <td>{d.driver}</td><td>{d.expected}</td><td className="mono">{d.n}</td>
+                  <td className={`mono${few ? " greyed" : ""}`}>{pct(d.correct / d.n)}{few && <span className="small" style={{ fontFamily: "var(--font-sans)" }}> · too few to judge</span>}</td>
+                  <td className={`mono${few ? " greyed" : ""}`}>{pct(lo)}–{pct(hi)}</td>
+                  <td>{d.failed.length ? <a href={`#f-${d.driver.replace(/\W+/g, "-")}`}>{d.failed.length} {d.failed.length === 1 ? "case" : "cases"}</a> : <span className="muted">none</span>}</td>
+                </tr>
+              );
+            })}</tbody>
+          </table></div>
+          <span className="small muted">Pass means the expected outcome happened and every check held. Rows with n under 20 are greyed out and labelled &ldquo;too few to judge&rdquo;.</span>
+        </section>
+
+        {r.failures.length > 0 && (
+          <section className="panel" aria-labelledby="c5">
+            <h2 id="c5" className="h2">Failing cases</h2>
+            <div className="table-wrap" tabIndex={0}><table style={{ minWidth: 640 }}>
+              <thead><tr><th>Case</th><th>Driver</th><th>Expected</th><th>Got</th><th>Failed checks</th></tr></thead>
+              <tbody>{r.failures.map((f, i) => {
+                const first = r.failures.findIndex((g) => g.driver === f.driver) === i;
+                return (
+                  <tr key={f.id} id={first ? `f-${f.driver.replace(/\W+/g, "-")}` : undefined}>
+                    <td className="mono">{f.id}</td><td>{f.driver}</td><td>{f.expected}</td><td className="mono">{f.got}</td><td className="small">{f.checks.join("; ")}</td>
+                  </tr>
+                );
+              })}</tbody>
+            </table></div>
+            <span className="small muted">Case ids are opaque hashes. The case text stays out of the repo because it comes from partner transcripts.</span>
+          </section>
+        )}
+
+        <section className="panel" aria-labelledby="c4">
+          <h2 id="c4" className="h2">Try it yourself</h2>
+          <div className="try">
+            {TRY.filter(([href]) => staff || href === "/chat").map(([href, t, d]) => (
+              <a key={t} href={href}><span style={{ fontWeight: 600 }}>{t}</span><span className="small muted">{d}</span></a>
+            ))}
+          </div>
+        </section>
+
+        <p className="small muted" style={{ margin: 0 }}>Method, known constraints and what this system does not do are in the repository README.</p>
+      </main>
+    </>
   );
 }

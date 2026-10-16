@@ -13,7 +13,7 @@ export const config = {
   tz: "America/Chicago",
   // Demo "now". The partner data's today is 2026-10-16; slots run to 2026-11-05.
   nowOverride: process.env.DEMO_NOW,
-  promptVersion: "agent-v1",
+  promptVersion: "agent-v2",
 };
 
 export const now = () => (config.nowOverride ? new Date(config.nowOverride) : new Date());

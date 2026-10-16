@@ -83,6 +83,10 @@ export function Chat() {
               setStatus(null);
               patch(aId, (x) => (x.kind === "assistant" ? { ...x, text: x.text + ev.text } : x));
               break;
+            case "text_discard":
+              finalText = finalText.slice(0, Math.max(0, finalText.length - ev.chars));
+              patch(aId, (x) => (x.kind === "assistant" ? { ...x, text: x.text.slice(0, Math.max(0, x.text.length - ev.chars)) } : x));
+              break;
             case "sources":
               patch(aId, (x) => (x.kind === "assistant" ? { ...x, sources: ev.sources } : x));
               break;

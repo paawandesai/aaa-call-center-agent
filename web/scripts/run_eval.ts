@@ -14,7 +14,7 @@ import { loadKb } from "../lib/kbload";
 import { migrate } from "../lib/migrate";
 import { SYSTEM_PROMPT } from "../lib/prompt";
 import { searchKb } from "../lib/retrieval";
-import { confirmBooking, findSlots, whenLabel, type ServiceType } from "../lib/scheduling";
+import { confirmBooking, findSlots, isConstraintViolation, whenLabel, type ServiceType } from "../lib/scheduling";
 import { loadSeedFromSqlite } from "../lib/seed";
 import { zipLookup } from "../lib/zones";
 import { pgliteDb } from "../test/pglite";
@@ -71,22 +71,33 @@ async function converse(id: string, turns: string[], sim?: { zip: string; openin
     }
     if (!text) break;
     t.turns++;
+    const before = t.events.length;
     let reply = "";
-    const r = await runTurn(deps, c, text, (e) => { if (e.type === "text_delta") reply += e.text; else t.events.push(e); });
+    const r = await runTurn(deps, c, text, (e) => { if (e.type === "text_delta") reply += e.text; else if (e.type === "text_discard") reply = reply.slice(0, reply.length - e.chars); else t.events.push(e); });
     t.texts.push(reply);
     t.inTok += r.inputTokens; t.outTok += r.outputTokens;
     for (const s of c.offered.keys()) t.offered.add(s);
+    // The chosen slot was taken before the card appeared: the simulated caller picks again from the new options.
+    if (t.events.slice(before).some((e) => e.type === "booking_failed")) t.pendingSlot = undefined;
     if (r.outcome === "error") { t.outcome = "error"; return t; }
     if (r.outcome === "safety") { t.outcome = "safety"; t.reason = "safety"; return t; }
     if (r.outcome === "handoff") { t.outcome = "handoff"; t.reason = r.handoffReason; return t; }
     if (r.outcome === "confirm_shown" && c.pending) {
       if (!sim && queue.length) { t.outcome = "confirm_pending"; continue; }
-      const b = await d.tx((q) => confirmBooking(q, c.pending!, randomBytes(8).toString("hex")));
+      const b = await d.tx((q) => confirmBooking(q, c.pending!, randomBytes(8).toString("hex")))
+        .catch((e) => (isConstraintViolation(e) ? ({ ok: false, reason: "slot_taken" } as const) : Promise.reject(e)));
       if (b.ok) {
         c.notes.push(`The caller pressed Confirm and the app booked it, reference ${b.ref}.`);
         t.outcome = "booked"; t.booked = { service: b.service }; return t;
       }
-      t.events.push({ type: "booking_failed", reason: b.reason, slots: [] });
+      // Mirror /api/bookings/confirm: on slot_taken the app offers new times and the caller picks again.
+      const p = c.pending!;
+      const next = b.reason === "slot_taken" ? await findSlots(d, { zone: p.zone, service_type: p.service_type }) : [];
+      for (const s of next) c.offered.set(s.slot_id, { slot_id: s.slot_id, zone: p.zone, zip: p.zip, city: p.city, service_type: p.service_type, date: s.date, window: s.window });
+      if (b.reason === "slot_taken") c.notes.push("The time the caller tried to confirm was just taken. The app showed new options.");
+      t.events.push({ type: "booking_failed", reason: b.reason, slots: next.map((s) => ({ slot_id: s.slot_id, date: s.date, window_label: whenLabel(s.date, s.window), tz: "America/Chicago" as const })) });
+      t.pendingSlot = undefined;
+      if (!next.length) break;
     }
   }
   if (t.events.some((e) => e.type === "confirm_request") && t.outcome !== "booked") t.outcome = "confirm_pending";
@@ -161,7 +172,7 @@ if (only !== "adversarial") {
     ceiling: rate(handled.length, n),
     accuracy: rate(handled.filter((r) => r.correct).length, handled.length),
     escalation: { precision: rate(esc.filter((r) => r.escalateExpected).length, esc.length), recall: rate(escExp.filter((r) => r.escalated).length, escExp.length) },
-    safety: rate(rows.filter((r) => r.expected === "safety" && r.got === "safety").length, rows.filter((r) => r.expected === "safety").length),
+    safety: rate(rows.filter((r) => r.expected === "safety" && r.got.startsWith("safety")).length, rows.filter((r) => r.expected === "safety").length),
     per_driver: drivers.map((dr) => {
       const rs = rows.filter((r) => r.driver === dr);
       return { driver: dr, n: rs.length, contained: rs.filter((r) => r.contained && r.correct).length, correct: rs.filter((r) => r.correct).length, failed: rs.filter((r) => !r.correct).map((r) => r.id) };
@@ -209,7 +220,7 @@ for (const it of R.items) {
 out.retrieval = { hit5: rate(hits, R.items.length), mrr: mrr / R.items.length, where: "app query on pgvector (PGlite), dev set" };
 
 const runId = new Date().toISOString().replace(/[-:]/g, "").slice(0, 13) + "-" + randomBytes(2).toString("hex");
-const configId = createHash("sha256").update(JSON.stringify([config.model, config.effort, config.maxTokens, SYSTEM_PROMPT])).digest("hex").slice(0, 10);
+const configId = createHash("sha256").update(JSON.stringify([config.model, config.effort, config.maxTokens, SYSTEM_PROMPT, "thinking:adaptive"])).digest("hex").slice(0, 10);
 const cost = (inTok * 4 + outTok * 20) / 1e6;
 const summary = { run_id: runId, created_at: new Date().toISOString(), config_id: configId, prompt_version: config.promptVersion, demo_now: process.env.DEMO_NOW,
   tokens: { input: inTok, output: outTok, est_cost_usd: Number(cost.toFixed(2)) }, ...out };

@@ -31,6 +31,7 @@ export async function POST(req: Request) {
 
   for (const [key, limit, ms] of [[`chat:${session.id}`, 20, 60_000], [`chatday:${session.id}`, 300, 86_400_000]] as const) {
     const r = allow(key, limit, ms);
+    if (!r.ok) void record({ session_id: session.id, kind: "rate_limit", outcome: "429" });
     if (!r.ok) return Response.json({ error: "rate_limited", retry_after_s: r.retryAfterS }, { status: 429, headers: { "Retry-After": String(r.retryAfterS) } });
   }
 
@@ -71,7 +72,7 @@ export async function POST(req: Request) {
             addSpend(r.inputTokens, r.outputTokens);
             void record({ session_id: session.id, turn_id: b.turn_id, kind: "turn", intent: r.intent, outcome: r.outcome,
               reason: r.handoffReason, latency_ms: Date.now() - started, first_token_ms: r.firstTokenMs, input_tokens: r.inputTokens,
-              output_tokens: r.outputTokens, top_score: r.topScore, meta: { tools: r.toolCalls.join(","), action: b.action ?? null } });
+              output_tokens: r.outputTokens, top_score: r.topScore, meta: { tools: r.toolCalls.join(","), action: b.action ?? null, conversation: b.conversation_id } });
           } finally {
             busy.delete(lockKey);
           }

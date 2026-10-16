@@ -19,3 +19,8 @@ export async function createHandoff(q: Queryable, c: Conversation, reason: Hando
   );
   return rows[0];
 }
+
+export async function openHandoffCount(q: Queryable): Promise<number> {
+  const { rows } = await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM handoffs WHERE status = 'open' AND created_at > now() - interval '7 days'`);
+  return rows[0]?.n ?? 0;
+}

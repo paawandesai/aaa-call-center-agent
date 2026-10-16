@@ -168,6 +168,7 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
           system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
           tools: TOOLS, // never varies within a conversation, so the cache prefix and thinking blocks stay valid
           tool_choice: round < config.maxToolRounds ? { type: "auto" } : { type: "none" },
+          thinking: { type: "adaptive" },
           output_config: { effort: config.effort },
           betas: ["server-side-fallback-2026-07-01"],
           fallbacks: "default",
@@ -175,11 +176,19 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
         },
         { signal },
       );
+      let roundChars = 0;
+      const hadFirstToken = res.firstTokenMs !== undefined;
       stream.on("text", (delta) => {
         res.firstTokenMs ??= Date.now() - started;
+        roundChars += delta.length;
         emit({ type: "text_delta", text: delta });
       });
       const msg = await stream.finalMessage();
+      // Text written alongside a tool call is the model thinking aloud, not a reply; take it back off the screen.
+      if (roundChars && msg.content.some((b) => b.type === "tool_use")) {
+        emit({ type: "text_discard", chars: roundChars });
+        if (!hadFirstToken) res.firstTokenMs = undefined; // time to first word counts shown words only
+      }
       res.inputTokens += (msg.usage.input_tokens ?? 0) + (msg.usage.cache_read_input_tokens ?? 0) + (msg.usage.cache_creation_input_tokens ?? 0);
       res.outputTokens += msg.usage.output_tokens ?? 0;
       c.messages.push({ role: "assistant", content: msg.content as Anthropic.Beta.BetaContentBlockParam[] });
@@ -236,7 +245,8 @@ function answerText(c: Conversation): string {
   for (let i = c.messages.length - 1; i >= 0; i--) {
     const m = c.messages[i];
     if (m.role === "user" && typeof m.content === "string") break;
-    if (m.role === "assistant" && Array.isArray(m.content)) for (const b of m.content) if (b.type === "text") out.push(b.text);
+    if (m.role === "assistant" && Array.isArray(m.content) && !m.content.some((b) => b.type === "tool_use"))
+      for (const b of m.content) if (b.type === "text") out.push(b.text);
   }
   return out.join(" ");
 }

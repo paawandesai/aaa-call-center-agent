@@ -25,3 +25,6 @@ export function overSpendCap(): boolean {
   if (spend.day !== day()) return false;
   return spend.usd >= Number(process.env.DAILY_SPEND_CAP_USD ?? 5);
 }
+export function spendToday(): { usd: number; cap: number } {
+  return { usd: spend.day === day() ? spend.usd : 0, cap: Number(process.env.DAILY_SPEND_CAP_USD ?? 5) };
+}
