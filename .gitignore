@@ -18,3 +18,9 @@ __pycache__/
 node_modules/
 .next/
 .DS_Store
+web/.models/
+web/test-results/
+web/playwright-report/
+web/.seed/
+*.tsbuildinfo
+next-env.d.ts

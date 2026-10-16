@@ -1,0 +1,333 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+import { config, now } from "./config";
+import type { Conversation } from "./conversations";
+import type { Db } from "./db";
+import type { Emit } from "./events";
+import { createHandoff } from "./handoffs";
+import { HANDOFF_COPY, route, SCRIPTS, type HandoffReason } from "./policy";
+import { SYSTEM_PROMPT, turnData } from "./prompt";
+import type { Passage } from "./retrieval";
+import { FEE_LABEL, findSlots, isSlotAvailable, SERVICE_LABEL, whenLabel, type ServiceType, type Slot } from "./scheduling";
+import { zipLookup } from "./zones";
+
+type Tool = Anthropic.Beta.BetaTool;
+const SERVICE_TYPES = ["hvac_repair", "hvac_tune_up", "plumbing", "estimate"] as const;
+const MODEL_HANDOFF_REASONS = ["safety", "billing_account", "cancel_reschedule", "complaint", "human_requested",
+  "low_confidence", "service_area_unclear", "booking_failed", "out_of_scope"] as const;
+
+// Narrow, read-only tools. None of them writes a booking: propose_booking only shows a confirm card.
+export const TOOLS: Tool[] = [
+  {
+    name: "search_kb",
+    description: "Search Meridian's customer-facing knowledge base again with a different query, when the passages provided with the message don't cover the question.",
+    strict: true,
+    input_schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"], additionalProperties: false },
+  },
+  {
+    name: "check_availability",
+    description: "Find up to 4 open appointment times for a new visit. The app shows them to the caller as buttons.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: {
+        service_type: { type: "string", enum: [...SERVICE_TYPES] },
+        zip: { type: "string", description: "5-digit ZIP code of the service address" },
+        on_or_after: { type: "string", description: "Earliest date the caller wants, YYYY-MM-DD, or empty for the soonest" },
+        part_of_day: { type: "string", enum: ["morning", "afternoon", "evening", "any"] },
+      },
+      required: ["service_type", "zip", "on_or_after", "part_of_day"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "propose_booking",
+    description: "Show the caller a confirmation card for one of the times returned by check_availability. Nothing is booked until the caller presses Confirm.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: {
+        slot_id: { type: "integer" },
+        caller_name: { type: "string", description: "Name the caller gave for the booking" },
+        issue_summary: { type: "string", description: "A few words on what the visit is for" },
+      },
+      required: ["slot_id", "caller_name", "issue_summary"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "handoff",
+    description: "Pass the conversation to a person on Meridian's team, with a short summary so the caller doesn't have to repeat themselves.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: {
+        reason: { type: "string", enum: [...MODEL_HANDOFF_REASONS] },
+        summary: { type: "string", description: "One or two sentences for staff: what the caller needs and what was already tried" },
+      },
+      required: ["reason", "summary"],
+      additionalProperties: false,
+    },
+  },
+];
+
+const SearchIn = z.object({ query: z.string().min(1).max(300) });
+const AvailIn = z.object({ service_type: z.enum(SERVICE_TYPES), zip: z.string().max(10), on_or_after: z.string().max(10),
+  part_of_day: z.enum(["morning", "afternoon", "evening", "any"]) });
+const ProposeIn = z.object({ slot_id: z.number().int(), caller_name: z.string().min(1).max(60), issue_summary: z.string().max(200) });
+const HandoffIn = z.object({ reason: z.enum(MODEL_HANDOFF_REASONS), summary: z.string().min(1).max(600) });
+
+export interface Deps {
+  db: Db;
+  anthropic: Anthropic;
+  search: (query: string) => Promise<Passage[]>;
+}
+
+export interface TurnResult {
+  outcome: "answered" | "slots_offered" | "confirm_shown" | "handoff" | "safety" | "deflected" | "error";
+  handoffReason?: HandoffReason;
+  intent?: string;
+  inputTokens: number;
+  outputTokens: number;
+  topScore?: number;
+  firstTokenMs?: number;
+  toolCalls: string[];
+}
+
+// What the caller sees under "What I've passed on" for policy-routed handoffs.
+const INTENT_SUMMARY: Record<string, string> = {
+  gas_leak: "You reported a possible gas smell. I showed the safety steps and marked it urgent.",
+  carbon_monoxide: "You reported a carbon monoxide alarm. I showed the safety steps and marked it urgent.",
+  sparks_smoke: "You reported sparks or smoke. I showed the safety steps and marked it urgent.",
+  burning_smell: "You reported a burning smell. I showed the safety steps and marked it urgent.",
+  self_harm: "You told me you're going through something serious. I shared the 988 crisis line and marked it urgent.",
+  human_requested: "You asked to speak with a person. Your message is in the queue.",
+  cancel_reschedule: "You want to change or cancel an existing appointment.",
+  billing: "You have a question about a bill, charge or payment.",
+  account_lookup: "You have a question that needs your account records.",
+  existing_appointment: "You want details about an existing appointment.",
+  complaint: "You have a concern about a past visit or our service.",
+};
+
+const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: config.tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(now());
+const slotEvent = (s: Slot) => ({ slot_id: s.slot_id, date: s.date, window_label: whenLabel(s.date, s.window), tz: "America/Chicago" as const });
+
+export async function runTurn(deps: Deps, c: Conversation, callerText: string, emit: Emit, signal?: AbortSignal): Promise<TurnResult> {
+  const started = Date.now();
+  const res: TurnResult = { outcome: "answered", inputTokens: 0, outputTokens: 0, toolCalls: [] };
+  const text = callerText.slice(0, 2000);
+
+  const scripted = async (reply: string, reason: HandoffReason | null, intent: string) => {
+    c.intents.push(intent);
+    // Keep the transcript coherent for later turns; the scripted reply is ours, not the model's.
+    c.messages.push({ role: "user", content: turnData(today(), [], text) });
+    c.messages.push({ role: "assistant", content: reply });
+    if (reason) {
+      const h = await createHandoff(deps.db, c, reason, `Routed by policy (${intent}).`, text);
+      c.handoff = reason;
+      emit({ type: "handoff", reason_enum: reason, summary_for_caller: INTENT_SUMMARY[intent] ?? HANDOFF_COPY[reason], queue_position: h?.position });
+    }
+  };
+
+  // 1. Deterministic policy runs first. Safety is one-way.
+  const r = route(text);
+  if (r.kind === "safety") {
+    c.safetyLock = true;
+    emit({ type: "safety", script: r.script, text: SCRIPTS[r.script] });
+    await scripted(SCRIPTS[r.script], "safety", r.intent);
+    return { ...res, outcome: "safety", handoffReason: "safety", intent: r.intent };
+  }
+  if (r.kind === "handoff") {
+    emit({ type: "text_delta", text: HANDOFF_COPY[r.reason] });
+    await scripted(HANDOFF_COPY[r.reason], r.reason, r.intent);
+    return { ...res, outcome: "handoff", handoffReason: r.reason, intent: r.intent };
+  }
+  if (r.kind === "deflect") {
+    emit({ type: "text_delta", text: SCRIPTS.injection });
+    await scripted(SCRIPTS.injection, null, r.intent);
+    return { ...res, outcome: "deflected", intent: r.intent };
+  }
+
+  // 2. Retrieval for this message.
+  emit({ type: "status", phase: "searching_kb" });
+  const passages = (await deps.search(text)).filter((p) => p.score >= config.minRetrievalScore);
+  res.topScore = passages[0]?.score;
+  const used: Passage[] = [...passages];
+  const notes = [c.caller.zip ? `The caller's ZIP code is ${c.caller.zip}.` : "", ...c.notes.splice(0)].filter(Boolean);
+  const extra = notes.length ? notes.join(" ") : undefined;
+  const base = c.messages.length;
+  c.messages.push({ role: "user", content: turnData(today(), passages, text, extra) });
+
+  let sawUiCard = false;
+  try {
+    for (let round = 0; round < config.maxToolRounds + 1; round++) {
+      const stream = deps.anthropic.beta.messages.stream(
+        {
+          model: config.model,
+          max_tokens: config.maxTokens,
+          system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+          tools: TOOLS, // never varies within a conversation, so the cache prefix and thinking blocks stay valid
+          tool_choice: round < config.maxToolRounds ? { type: "auto" } : { type: "none" },
+          output_config: { effort: config.effort },
+          betas: ["server-side-fallback-2026-07-01"],
+          fallbacks: "default",
+          messages: c.messages,
+        },
+        { signal },
+      );
+      stream.on("text", (delta) => {
+        res.firstTokenMs ??= Date.now() - started;
+        emit({ type: "text_delta", text: delta });
+      });
+      const msg = await stream.finalMessage();
+      res.inputTokens += (msg.usage.input_tokens ?? 0) + (msg.usage.cache_read_input_tokens ?? 0) + (msg.usage.cache_creation_input_tokens ?? 0);
+      res.outputTokens += msg.usage.output_tokens ?? 0;
+      c.messages.push({ role: "assistant", content: msg.content as Anthropic.Beta.BetaContentBlockParam[] });
+
+      if (msg.stop_reason === "refusal") {
+        await modelHandoff(deps, c, "low_confidence", "The assistant declined to answer.", text, emit, res);
+        break;
+      }
+      const uses = msg.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
+      if (uses.length === 0) break;
+      if (msg.stop_reason === "max_tokens") {
+        await modelHandoff(deps, c, "low_confidence", "The assistant's reply was cut off.", text, emit, res);
+        c.messages.push({ role: "user", content: uses.map((u) => ({ type: "tool_result" as const, tool_use_id: u.id, is_error: true, content: "Turn ended." })) });
+        break;
+      }
+
+      const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
+      for (const u of uses) {
+        res.toolCalls.push(u.name);
+        c.steps.push(u.name);
+        const out = await runTool(deps, c, u, text, emit, res, used);
+        if (out.card) sawUiCard = true;
+        results.push({ type: "tool_result", tool_use_id: u.id, content: out.content, is_error: out.isError || undefined });
+      }
+      c.messages.push({ role: "user", content: results });
+    }
+  } catch (e) {
+    // Roll back this turn's unanswered tail so a retry starts clean; earlier turns are untouched.
+    c.messages.length = base;
+    if (e instanceof Anthropic.APIUserAbortError) throw e;
+    const retryable = e instanceof Anthropic.RateLimitError || e instanceof Anthropic.InternalServerError || e instanceof Anthropic.APIConnectionError;
+    emit({ type: "error", code: e instanceof Anthropic.APIError ? `model_${e.status ?? "conn"}` : "server_error", retryable });
+    return { ...res, outcome: "error" };
+  }
+
+  if (res.outcome === "answered" && !sawUiCard) {
+    const seen = new Set<string>();
+    const sources = [];
+    // Show a passage as a source only if the answer visibly uses it (shared amounts or content words).
+    const answer = answerText(c);
+    for (const p of [...used].sort((a, b) => b.score - a.score).filter((p) => supports(p.text, answer))) {
+      if (seen.has(p.doc)) continue;
+      seen.add(p.doc);
+      sources.push({ doc_title: p.doc_title, effective_date: p.effective, section: p.section });
+      if (sources.length === 3) break;
+    }
+    if (sources.length) emit({ type: "sources", sources });
+  }
+  return res;
+}
+
+function answerText(c: Conversation): string {
+  const out: string[] = [];
+  for (let i = c.messages.length - 1; i >= 0; i--) {
+    const m = c.messages[i];
+    if (m.role === "user" && typeof m.content === "string") break;
+    if (m.role === "assistant" && Array.isArray(m.content)) for (const b of m.content) if (b.type === "text") out.push(b.text);
+  }
+  return out.join(" ");
+}
+
+const STOP = new Set("about after again their there these those which would could should where while cannot visit thanks great please today".split(" "));
+const words = (s: string) => new Set((s.toLowerCase().match(/[a-z]{5,}/g) ?? []).filter((w) => !STOP.has(w)));
+const figures = (s: string) => new Set(s.match(/\$\s?[\d,]+(?:\.\d+)?|\d+(?:\.\d+)?\s?%|\b\d{2,}\b/g) ?? []);
+
+export function supports(passage: string, answer: string): boolean {
+  const fa = figures(answer);
+  for (const f of figures(passage)) if (f.length > 2 && fa.has(f)) return true;
+  const wa = words(answer);
+  let shared = 0;
+  for (const w of words(passage)) if (wa.has(w) && ++shared >= 4) return true;
+  return false;
+}
+
+async function modelHandoff(deps: Deps, c: Conversation, reason: HandoffReason, summary: string, text: string, emit: Emit, res: TurnResult) {
+  if (reason === "safety") {
+    c.safetyLock = true;
+    emit({ type: "safety", script: "gas_co_fire", text: SCRIPTS.gas_co_fire });
+  }
+  const h = await createHandoff(deps.db, c, reason, summary, text);
+  c.handoff = reason;
+  res.outcome = reason === "safety" ? "safety" : "handoff";
+  res.handoffReason = reason;
+  emit({ type: "handoff", reason_enum: reason, summary_for_caller: summary.slice(0, 400), queue_position: h?.position });
+}
+
+async function runTool(
+  deps: Deps, c: Conversation, u: Anthropic.Beta.BetaToolUseBlock, text: string, emit: Emit, res: TurnResult, used: Passage[],
+): Promise<{ content: string; isError?: boolean; card?: boolean }> {
+  const bad = (msg: string) => ({ content: msg, isError: true });
+  switch (u.name) {
+    case "search_kb": {
+      const p = SearchIn.safeParse(u.input);
+      if (!p.success) return bad("INVALID_INPUT");
+      emit({ type: "status", phase: "searching_kb" });
+      const hits = (await deps.search(p.data.query)).filter((x) => x.score >= config.minRetrievalScore);
+      used.push(...hits);
+      return { content: JSON.stringify(hits.map((h) => ({ id: h.id, title: h.doc_title, effective: h.effective, text: h.text }))) };
+    }
+    case "check_availability": {
+      const p = AvailIn.safeParse(u.input);
+      if (!p.success) return bad("INVALID_INPUT");
+      if (c.safetyLock) return bad("Booking is not available in this conversation because of a safety concern.");
+      const z = zipLookup(p.data.zip);
+      if (z.kind === "unknown") return bad("That is not a valid 5-digit ZIP code. Ask the caller for it again.");
+      c.caller.zip = p.data.zip.slice(0, 5);
+      if (z.kind === "not_serviced") return { content: JSON.stringify({ result: "not_in_service_area", city: z.city || null }) };
+      if (z.kind === "unclear") {
+        await modelHandoff(deps, c, "service_area_unclear", `Caller wants a ${SERVICE_LABEL[p.data.service_type].toLowerCase()} in ${z.city} (${c.caller.zip}); ${z.why}.`, text, emit, res);
+        return { content: JSON.stringify({ result: "handed_off", why: "The team needs to confirm coverage for this ZIP. Tell the caller a person will follow up." }), card: true };
+      }
+      emit({ type: "status", phase: "checking_availability" });
+      const slots = await findSlots(deps.db, { zone: z.zone, service_type: p.data.service_type, on_or_after: p.data.on_or_after, part_of_day: p.data.part_of_day });
+      if (slots.length === 0) return { content: JSON.stringify({ result: "no_openings" }) };
+      for (const s of slots) c.offered.set(s.slot_id, { slot_id: s.slot_id, zone: z.zone, zip: c.caller.zip, city: z.city, service_type: p.data.service_type, date: s.date, window: s.window });
+      emit({ type: "slots", slots: slots.map(slotEvent) });
+      res.outcome = "slots_offered";
+      return { content: JSON.stringify({ result: "shown_to_caller", options: slots.map((s) => ({ slot_id: s.slot_id, when: whenLabel(s.date, s.window) })) }), card: true };
+    }
+    case "propose_booking": {
+      const p = ProposeIn.safeParse(u.input);
+      if (!p.success) return bad("INVALID_INPUT");
+      if (c.safetyLock) return bad("Booking is not available in this conversation because of a safety concern.");
+      const o = c.offered.get(p.data.slot_id);
+      if (!o) return bad("That slot_id was not offered in this conversation. Call check_availability first.");
+      const still = await isSlotAvailable(deps.db, o.slot_id, o.zone, o.service_type);
+      if (!still) {
+        const next = await findSlots(deps.db, { zone: o.zone, service_type: o.service_type });
+        for (const s of next) c.offered.set(s.slot_id, { ...o, slot_id: s.slot_id, date: s.date, window: s.window });
+        emit({ type: "booking_failed", reason: "slot_taken", slots: next.map(slotEvent) });
+        return { content: JSON.stringify({ result: "slot_taken", new_options_shown: next.length }), card: true };
+      }
+      c.caller.name = p.data.caller_name.trim();
+      c.pending = { session_id: c.sessionId, slot_id: o.slot_id, zone: o.zone, zip: o.zip, city: o.city, service_type: o.service_type,
+        name: c.caller.name, issue: p.data.issue_summary };
+      emit({ type: "status", phase: "booking" });
+      emit({ type: "confirm_request", service: SERVICE_LABEL[o.service_type], slot_id: o.slot_id, when_label: whenLabel(o.date, o.window),
+        zip: o.zip, name: c.caller.name, fee_label: FEE_LABEL[o.service_type] });
+      res.outcome = "confirm_shown";
+      return { content: JSON.stringify({ result: "confirm_card_shown", note: "Not booked yet. The caller must press Confirm." }), card: true };
+    }
+    case "handoff": {
+      const p = HandoffIn.safeParse(u.input);
+      if (!p.success) return bad("INVALID_INPUT");
+      await modelHandoff(deps, c, p.data.reason, p.data.summary, text, emit, res);
+      return { content: JSON.stringify({ result: "handed_off", note: "Tell the caller in one short sentence that a person will follow up." }), card: true };
+    }
+    default:
+      return bad("Unknown tool.");
+  }
+}

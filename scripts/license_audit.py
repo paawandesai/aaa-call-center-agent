@@ -1,5 +1,7 @@
-"""Write LICENSES.md from the active Python environment and flag disallowed licenses."""
+"""Write LICENSES.md from the active Python environment and web/package-lock.json, and flag disallowed licenses."""
 import importlib.metadata as md
+import json
+import re
 import sys
 
 SKIP = {"pip", "setuptools"}
@@ -37,6 +39,22 @@ def license_of(dist) -> str:
     return "; ".join(classifiers) or (meta.get("License") or "UNKNOWN").splitlines()[0][:60]
 
 
+# Reviewed exceptions: LGPL libvips ships as an unmodified, dynamically loaded prebuilt binary inside sharp
+# (image processing for next and transformers.js), which the GPL ban does not cover. MPL-2.0 dev tools are unmodified.
+LGPL_OK = re.compile(r"^@img/sharp-")
+
+
+def npm_rows() -> list[tuple[str, str, str, str]]:
+    lock = json.load(open("web/package-lock.json"))["packages"]
+    rows = []
+    for key, v in lock.items():
+        if not key:
+            continue
+        name = key.split("node_modules/")[-1]
+        rows.append((name, v.get("version", ""), v.get("license", "UNKNOWN"), "dev" if v.get("dev") else "runtime"))
+    return sorted(set(rows), key=lambda r: r[0].lower())
+
+
 def main() -> int:
     rows = sorted(((d.metadata["Name"], d.version, license_of(d)) for d in md.distributions()), key=lambda r: r[0].lower())
     rows = [r for r in rows if r[0] not in SKIP]
@@ -45,8 +63,17 @@ def main() -> int:
              "(`requirements-discovery.txt`). Re-run before submission.", "",
              "| Package | Version | License |", "|---|---|---|"]
     lines += [f"| {n} | {v} | {lic} |" for n, v, lic in rows]
+    npm = npm_rows()
+    lines += ["", "## Web app (npm, from `web/package-lock.json`)", "",
+              "LGPL-3.0 entries are sharp's prebuilt libvips binaries: unmodified and dynamically loaded, not GPL-linked code. "
+              "MPL-2.0 entries (axe-core, lightningcss) are unmodified dev/build tools. "
+              "`onnxruntime-web` is a pre-release pulled by transformers.js; the server uses `onnxruntime-node`.", "",
+              "| Package | Version | License | Scope |", "|---|---|---|---|"]
+    lines += [f"| {n} | {v} | {lic} | {scope} |" for n, v, lic, scope in npm]
     open("LICENSES.md", "w").write("\n".join(lines) + "\n")
     flagged = [r for r in rows if any(x in r[2].upper() for x in DISALLOWED)]
+    flagged += [r for r in npm if any(x in r[2].upper().replace("LGPL", "") for x in DISALLOWED)
+                or ("LGPL" in r[2].upper() and not LGPL_OK.match(r[0]))]
     print(f"packages={len(rows)} flagged={flagged}")
     return 1 if flagged else 0
 

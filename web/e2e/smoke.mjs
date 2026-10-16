@@ -1,0 +1,35 @@
+// Manual browser smoke run against a local server (real model). Saves screenshots to $SHOTS.
+import { chromium } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+const base = process.env.BASE ?? "http://localhost:3100";
+const shots = process.env.SHOTS ?? ".";
+const browser = await chromium.launch({ executablePath: process.env.CHROME ?? "/opt/pw-browsers/chromium" });
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const page = await ctx.newPage();
+const errors = [];
+page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+await page.goto(base + "/");
+console.log("gate axe:", (await new AxeBuilder({ page }).analyze()).violations.map((v) => v.id));
+await page.fill("#code", process.env.CODE ?? "demo-invite-1");
+await page.check("input[type=checkbox]");
+await page.click("button[type=submit]");
+await page.waitForURL("**/chat");
+const ask = async (t) => {
+  await page.fill("#msg", t);
+  await page.keyboard.press("Enter");
+  await page.waitForSelector("button:has-text('Send')", { timeout: 90000 });
+};
+await ask("How much is a tune-up?");
+await ask("My furnace won't turn on. Can someone come out? ZIP 78745");
+await page.locator(".slot").first().click();
+await page.waitForSelector("button:has-text('Send')", { timeout: 90000 });
+if (!(await page.locator("text=Please check these").count())) await ask("Jordan Lee");
+await page.screenshot({ path: `${shots}/chat_confirm.png`, fullPage: true });
+await page.click("button:has-text('Confirm booking')");
+await page.waitForSelector("text=✓ Booked", { timeout: 30000 });
+await ask("there's a burning smell coming from the vents");
+await page.screenshot({ path: `${shots}/chat_full.png`, fullPage: true });
+console.log("chat axe:", (await new AxeBuilder({ page }).analyze()).violations.map((v) => `${v.id}:${v.nodes.length}`));
+console.log("log text:\n" + (await page.locator("[role=log]").innerText()).slice(0, 4000));
+console.log("console errors:", errors);
+await browser.close();

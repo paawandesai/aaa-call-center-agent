@@ -1,0 +1,35 @@
+import { NextResponse, type NextRequest } from "next/server";
+
+// Only CSP nonce and headers here. Authorization happens in each route handler and server component.
+export function proxy(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const dev = process.env.NODE_ENV !== "production";
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
+    "style-src 'self' 'unsafe-inline'", // React style attributes; scripts stay nonce-only
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
+  const headers = new Headers(request.headers);
+  headers.delete("x-middleware-subrequest"); // CVE-2025-29927 class: never trust this header from outside
+  headers.set("x-nonce", nonce);
+  headers.set("Content-Security-Policy", csp);
+  const res = NextResponse.next({ request: { headers } });
+  res.headers.set("Content-Security-Policy", csp);
+  res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.headers.set("X-Content-Type-Options", "nosniff");
+  res.headers.set("Permissions-Policy", "microphone=(self), camera=(), geolocation=()");
+  res.headers.set("X-Robots-Tag", "noindex, nofollow");
+  res.headers.set("X-Frame-Options", "DENY");
+  return res;
+}
+
+export const config = {
+  matcher: [{ source: "/((?!_next/static|_next/image|favicon.ico).*)" }],
+};
