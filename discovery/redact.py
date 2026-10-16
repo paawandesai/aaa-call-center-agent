@@ -23,7 +23,7 @@ PATTERNS = [
     ("ZIP", re.compile(r"\b7\d{4}\b")),
     ("GATE_CODE", re.compile(r"(?i)(gate code|code is)\s*[#:]?\s*\d{3,8}")),
 ]
-NAME_PROMPT = re.compile(r"(?i)\b(your name|the name|name on the account|who am i speaking)")
+NAME_PROMPT = re.compile(r"(?i)\b(name|who am i speaking)\b")
 # Company, plan and equipment brand words spaCy sometimes tags as PERSON.
 KEEP = {"Meridian", "Home", "Comfort", "Club", "Plus", "Trane", "Carrier", "Lennox", "Goodman",
         "Rheem", "American", "Standard", "Nest", "Ecobee", "Honeywell"}
@@ -62,7 +62,7 @@ def redact(text: str, nlp, staff: set[str], lexicon: set[str], counts: Counter) 
     text, n = staff_re.subn("[STAFF]", text)
     counts["STAFF"] += n
     if lexicon:
-        lex_re = re.compile(r"\b(" + "|".join(map(re.escape, sorted(lexicon))) + r")\b")
+        lex_re = re.compile(r"\b(" + "|".join(map(re.escape, sorted(lexicon))) + r")\b", re.I)
         text, n = lex_re.subn("[NAME]", text)
         counts["NAME_LEXICON"] += n
     out, prev_agent = [], ""

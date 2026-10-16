@@ -6,10 +6,33 @@ SKIP = {"pip", "setuptools"}
 DISALLOWED = ("GPL", "NON-COMMERCIAL", "NONCOMMERCIAL", "CC-BY-NC", "UNKNOWN")
 
 
+KNOWN_TEXTS = (("Apache License", "Apache-2.0 (from bundled LICENSE)"), ("MIT License", "MIT (from bundled LICENSE)"),
+               ("Permission is hereby granted, free of charge", "MIT (from bundled LICENSE)"),
+               ("Redistribution and use in source and binary forms", "BSD (from bundled LICENSE)"))
+
+
+def bundled_license(dist) -> str:
+    for f in dist.files or []:
+        if "licen" in f.name.lower() or "copying" in f.name.lower():
+            try:
+                text = f.read_text()
+            except (OSError, UnicodeDecodeError):
+                continue
+            for needle, name in KNOWN_TEXTS:
+                if needle in text:
+                    return name
+    return ""
+
+
 def license_of(dist) -> str:
     meta = dist.metadata
     if meta.get("License-Expression"):
         return meta["License-Expression"]
+    classifiers = [c for c in meta.get_all("Classifier") or [] if c.startswith("License ::")]
+    if not classifiers or any("Other/Proprietary" in c for c in classifiers):
+        found = bundled_license(dist)
+        if found:
+            return found
     classifiers = [c.split("::")[-1].strip() for c in meta.get_all("Classifier") or [] if c.startswith("License ::")]
     return "; ".join(classifiers) or (meta.get("License") or "UNKNOWN").splitlines()[0][:60]
 
