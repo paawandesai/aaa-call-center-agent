@@ -1,0 +1,9 @@
+stages: [scan]
+
+secret-scan:
+  stage: scan
+  image:
+    name: zricethezav/gitleaks:v8.28.0
+    entrypoint: [""]
+  script:
+    - gitleaks git --redact --no-banner --verbose .
