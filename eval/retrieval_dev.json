@@ -1,0 +1,317 @@
+{
+ "_about": "Retrieval dev set: caller questions from the DISCOVERY split (Jul-Aug), paraphrased and redacted, follow-ups rewritten to stand alone. Gold = any chunk whose doc matches and whose text contains the section marker. Not the final test set; that comes from the September holdout.",
+ "items": [
+  {
+   "id": "d01",
+   "intent": "membership_renewal",
+   "q": "I got an email that my membership is renewing. When does it actually charge my card?",
+   "gold": [
+    [
+     "membership/comfort_club_overview.md",
+     "Billing and renewal"
+    ]
+   ]
+  },
+  {
+   "id": "d02",
+   "intent": "membership_renewal",
+   "q": "Can I still cancel my membership before it renews?",
+   "gold": [
+    [
+     "membership/comfort_club_overview.md",
+     "Cancellation"
+    ]
+   ]
+  },
+  {
+   "id": "d03",
+   "intent": "membership_info",
+   "q": "What does the Comfort Club membership include?",
+   "gold": [
+    [
+     "membership/comfort_club_overview.md",
+     "Comfort Club (Standard)"
+    ]
+   ]
+  },
+  {
+   "id": "d04",
+   "intent": "membership_info",
+   "q": "How much does the Comfort Club membership cost?",
+   "gold": [
+    [
+     "membership/comfort_club_overview.md",
+     "Comfort Club (Standard)"
+    ],
+    [
+     "pricing/2026_fee_schedule.pdf",
+     "Membership (annual"
+    ]
+   ]
+  },
+  {
+   "id": "d05",
+   "intent": "membership_info",
+   "q": "Does the Comfort Club cover plumbing?",
+   "gold": [
+    [
+     "membership/comfort_club_overview.md",
+     "Comfort Club Plus"
+    ]
+   ]
+  },
+  {
+   "id": "d06",
+   "intent": "membership_info",
+   "q": "How much is the maintenance plan?",
+   "gold": [
+    [
+     "membership/comfort_club_overview.md",
+     "Comfort Club (Standard)"
+    ],
+    [
+     "pricing/2026_fee_schedule.pdf",
+     "Membership (annual"
+    ]
+   ]
+  },
+  {
+   "id": "d07",
+   "intent": "membership_info",
+   "q": "I thought the membership was $149 a year?",
+   "gold": [
+    [
+     "membership/comfort_club_overview.md",
+     "Comfort Club (Standard)"
+    ],
+    [
+     "pricing/2026_fee_schedule.pdf",
+     "Membership (annual"
+    ]
+   ]
+  },
+  {
+   "id": "d08",
+   "intent": "membership_info",
+   "q": "I'm a member. Do I get a discount on a new system?",
+   "gold": [
+    [
+     "membership/comfort_club_overview.md",
+     "$500 off"
+    ],
+    [
+     "pricing/2026_fee_schedule.pdf",
+     "Full system replacement credit"
+    ],
+    [
+     "services/service_catalog.md",
+     "System replacement"
+    ]
+   ]
+  },
+  {
+   "id": "d09",
+   "intent": "membership_upgrade",
+   "q": "Can I upgrade from the regular plan to the Plus plan in the middle of the year?",
+   "gold": [
+    [
+     "membership/comfort_club_overview.md",
+     "Upgrades"
+    ]
+   ]
+  },
+  {
+   "id": "d10",
+   "intent": "replacement_estimate",
+   "q": "My system is 18 years old and I'm thinking about replacing it. Roughly what would that cost?",
+   "gold": [
+    [
+     "services/service_catalog.md",
+     "System replacement"
+    ]
+   ]
+  },
+  {
+   "id": "d11",
+   "intent": "warranty_transfer",
+   "q": "We just bought a house and the previous owner had a system installed by you. Does the warranty transfer?",
+   "gold": [
+    [
+     "warranty/warranty_policy.md",
+     "Warranty transfer"
+    ]
+   ]
+  },
+  {
+   "id": "d12",
+   "intent": "warranty_coverage",
+   "q": "My compressor died and the system is only three years old. Is that under warranty?",
+   "gold": [
+    [
+     "warranty/warranty_policy.md",
+     "Compressor"
+    ],
+    [
+     "warranty/warranty_policy.md",
+     "part only"
+    ],
+    [
+     "warranty/warranty_policy.md",
+     "New system installation"
+    ]
+   ]
+  },
+  {
+   "id": "d13",
+   "intent": "warranty_coverage",
+   "q": "How much is labor to replace a compressor?",
+   "gold": [
+    [
+     "services/service_catalog.md",
+     "Compressor replacement"
+    ],
+    [
+     "pricing/repair_price_book_2026.csv",
+     "Compressor replacement labor"
+    ]
+   ]
+  },
+  {
+   "id": "d14",
+   "intent": "warranty_coverage",
+   "q": "Does the labor warranty cover a repeat repair? You fixed my blower in March and it's doing the same thing.",
+   "gold": [
+    [
+     "warranty/warranty_policy.md",
+     "Repair warranty"
+    ]
+   ]
+  },
+  {
+   "id": "d15",
+   "intent": "warranty_claim",
+   "q": "I need to file a warranty claim. The unit you installed last year stopped working.",
+   "gold": [
+    [
+     "warranty/warranty_policy.md",
+     "Filing a claim"
+    ],
+    [
+     "warranty/warranty_policy.md",
+     "New system installation"
+    ]
+   ]
+  },
+  {
+   "id": "d16",
+   "intent": "warranty_registration",
+   "q": "Did you register my new unit with the manufacturer? I never got anything.",
+   "gold": [
+    [
+     "warranty/warranty_policy.md",
+     "registers every installed unit"
+    ]
+   ]
+  },
+  {
+   "id": "d17",
+   "intent": "pay_invoice",
+   "q": "Can I pay my invoice over the phone?",
+   "gold": [
+    [
+     "faq/customer_faq.md",
+     "Payment"
+    ]
+   ]
+  },
+  {
+   "id": "d18",
+   "intent": "duplicate_charge",
+   "q": "I see two charges from you on my card. Am I paying twice?",
+   "gold": [
+    [
+     "faq/customer_faq.md",
+     "Duplicate charges"
+    ]
+   ]
+  },
+  {
+   "id": "d19",
+   "intent": "repair_booking",
+   "q": "There's water pooling around the indoor unit. What should I do?",
+   "gold": [
+    [
+     "faq/troubleshooting_before_you_call.md",
+     "Water pooling"
+    ]
+   ]
+  },
+  {
+   "id": "d20",
+   "intent": "repair_booking",
+   "q": "My thermostat screen is blank.",
+   "gold": [
+    [
+     "faq/troubleshooting_before_you_call.md",
+     "Thermostat screen is blank"
+    ]
+   ]
+  },
+  {
+   "id": "d21",
+   "intent": "repair_booking",
+   "q": "The furnace won't kick on.",
+   "gold": [
+    [
+     "faq/troubleshooting_before_you_call.md",
+     "Furnace won't turn on"
+    ]
+   ]
+  },
+  {
+   "id": "d22",
+   "intent": "repair_booking",
+   "q": "The AC runs but the air coming out is warm.",
+   "gold": [
+    [
+     "faq/troubleshooting_before_you_call.md",
+     "AC not cooling"
+    ]
+   ]
+  },
+  {
+   "id": "d23",
+   "intent": "repair_booking",
+   "q": "My kitchen sink is backing up. Do you handle that?",
+   "gold": [
+    [
+     "services/service_catalog.md",
+     "Plumbing (residential)"
+    ],
+    [
+     "pricing/repair_price_book_2026.csv",
+     "Drain clearing"
+    ]
+   ]
+  },
+  {
+   "id": "d24",
+   "intent": "tune_up",
+   "q": "How much is an annual tune-up?",
+   "gold": [
+    [
+     "services/service_catalog.md",
+     "Maintenance tune-up"
+    ],
+    [
+     "pricing/2026_fee_schedule.pdf",
+     "Seasonal tune-up"
+    ],
+    [
+     "pricing/repair_price_book_2026.csv",
+     "Seasonal tune-up"
+    ]
+   ]
+  }
+ ]
+}
