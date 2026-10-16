@@ -143,8 +143,8 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     return { ...res, outcome: "handoff", handoffReason: r.reason, intent: r.intent };
   }
   if (r.kind === "deflect") {
-    emit({ type: "text_delta", text: SCRIPTS.injection });
-    await scripted(SCRIPTS.injection, null, r.intent);
+    emit({ type: "text_delta", text: SCRIPTS[r.script] });
+    await scripted(SCRIPTS[r.script], null, r.intent);
     return { ...res, outcome: "deflected", intent: r.intent };
   }
 

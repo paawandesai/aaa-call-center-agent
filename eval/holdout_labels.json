@@ -1,0 +1,702 @@
+[
+{
+"id": "237e02acfb",
+"driver": "Billing and payments",
+"intent": "billing_dispute",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "dd114a01c8",
+"driver": "Billing and payments",
+"intent": "duplicate_charge",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "9d6f158d36",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "f49855c5b7",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "0484247c0e",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "462be5f01c",
+"driver": "Existing appointment",
+"intent": "appt_cancel",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "8253f6a6f9",
+"driver": "Billing and payments",
+"intent": "billing_dispute",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "3d628b2026",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "177564de93",
+"driver": "Warranty",
+"intent": "warranty_claim",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "95c8cca5ae",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_cancel",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "22b6483f0d",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "ba1ed085d5",
+"driver": "Warranty",
+"intent": "warranty_registration",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "71e51d2ab6",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_upgrade",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "230f008e33",
+"driver": "Other (redirect)",
+"intent": "wrong_number",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "170ae6f736",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "8edb1154ef",
+"driver": "Existing appointment",
+"intent": "appt_cancel",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "fbeefd7859",
+"driver": "Safety emergency",
+"intent": "safety_emergency",
+"zip": "78640",
+"expected": "safety"
+},
+{
+"id": "d4e452c8b0",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "6ae7311193",
+"driver": "Safety emergency",
+"intent": "safety_emergency",
+"zip": "78664",
+"expected": "safety"
+},
+{
+"id": "6ae62e9d90",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "047b556d14",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "396d0458f4",
+"driver": "Safety emergency",
+"intent": "safety_emergency",
+"zip": "78640",
+"expected": "safety"
+},
+{
+"id": "12aa871422",
+"driver": "Billing and payments",
+"intent": "autopay_setup",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "ed45110807",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_cancel",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "cb088b9ecb",
+"driver": "Warranty",
+"intent": "warranty_coverage",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "1e8a006b0e",
+"driver": "Other (redirect)",
+"intent": "wrong_number",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "cf4db361a1",
+"driver": "Billing and payments",
+"intent": "billing_dispute",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "aceed12343",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "683683c861",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "f80ecf41bf",
+"driver": "Complaint / escalation request",
+"intent": "complaint_manager",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "ebc5ca4a91",
+"driver": "Repair / service booking",
+"intent": "tune_up",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "3b3826a095",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "65dd997813",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "17e13b36be",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "50d74c8909",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "4f59cc546e",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "3ab36a0fd8",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_cancel",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "bd1f17d58e",
+"driver": "Safety emergency",
+"intent": "safety_emergency",
+"zip": "78640",
+"expected": "safety"
+},
+{
+"id": "1606b0b10a",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "ca2d3f4770",
+"driver": "Existing appointment",
+"intent": "appt_confirm",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "6cdd8b914b",
+"driver": "System replacement estimate",
+"intent": "replacement_estimate",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "a7bf473de7",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "daed482506",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "195245335e",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "1908179bc7",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "51896daade",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_renewal",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "acde8bb14e",
+"driver": "Billing and payments",
+"intent": "billing_dispute",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "0c8ba5a819",
+"driver": "Billing and payments",
+"intent": "autopay_setup",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "6ab24c93d7",
+"driver": "Warranty",
+"intent": "warranty_coverage",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "6abed0bbb3",
+"driver": "Existing appointment",
+"intent": "appt_cancel",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "59d4838916",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "35d4ca40e1",
+"driver": "Repair / service booking",
+"intent": "tune_up",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "f6ee89d6f6",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "2e33d089ae",
+"driver": "Repair / service booking",
+"intent": "tune_up",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "b8c33841fe",
+"driver": "Warranty",
+"intent": "warranty_claim",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "25fa4099a5",
+"driver": "Billing and payments",
+"intent": "duplicate_charge",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "69fa478d73",
+"driver": "Billing and payments",
+"intent": "billing_dispute",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "714bd0f9fa",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "44219988e4",
+"driver": "Existing appointment",
+"intent": "appt_confirm",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "d247fa7938",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "91e279a5db",
+"driver": "Repair / service booking",
+"intent": "tune_up",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "e77b269ab1",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_info",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "3f8240a263",
+"driver": "System replacement estimate",
+"intent": "replacement_estimate",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "9e05cc0072",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "3f4e278a41",
+"driver": "Billing and payments",
+"intent": "duplicate_charge",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "6b9d326586",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_info",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "af1db89a25",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "bb135f63bc",
+"driver": "Repair / service booking",
+"intent": "tune_up",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "92b859b98b",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_info",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "239f473cad",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "6bab5246c2",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "54ebdeeac6",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "1ada312874",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "c558067e34",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "0db8d78778",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_renewal",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "b517d681b1",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_renewal",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "fa7175f3da",
+"driver": "Warranty",
+"intent": "warranty_claim",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "5f2e4f1508",
+"driver": "Repair / service booking",
+"intent": "tune_up",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "4e50297879",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "b4aaaf684b",
+"driver": "Billing and payments",
+"intent": "duplicate_charge",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "e73582b4b9",
+"driver": "Safety emergency",
+"intent": "safety_emergency",
+"zip": "78664",
+"expected": "safety"
+},
+{
+"id": "fda2cace20",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "833e25975d",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_info",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "b7af0f55de",
+"driver": "Existing appointment",
+"intent": "tech_late",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "6ae6ab67d8",
+"driver": "Safety emergency",
+"intent": "safety_emergency",
+"zip": "78640",
+"expected": "safety"
+},
+{
+"id": "11c6a7d37d",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "6c2361e4c7",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "48444dd5e7",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_info",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "1093c6c3cf",
+"driver": "Other (redirect)",
+"intent": "commercial",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "124865d025",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "da0082d508",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "5654c174a9",
+"driver": "Other (redirect)",
+"intent": "commercial",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "c7540d0a75",
+"driver": "Repair / service booking",
+"intent": "booking_plus_membership",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "36bf7e7aee",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "d3c939a9b3",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "07f3f99af3",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "2f917126ab",
+"driver": "Repair / service booking",
+"intent": "tune_up",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "bfd9cb0fae",
+"driver": "Other (redirect)",
+"intent": "wrong_number",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "e9c544aef0",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "3d18c660e6",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+}
+]

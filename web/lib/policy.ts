@@ -7,7 +7,7 @@ export type HandoffReason =
 export type Route =
   | { kind: "safety"; script: "gas_co_fire" | "self_harm"; intent: string }
   | { kind: "handoff"; reason: HandoffReason; intent: string }
-  | { kind: "deflect"; script: "injection"; intent: string }
+  | { kind: "deflect"; script: "injection" | "ai_disclosure"; intent: string }
   | { kind: "model" };
 
 const t = (s: string) => new RegExp(s, "i");
@@ -21,7 +21,7 @@ const SAFETY: [RegExp, Route & { kind: "safety" }][] = [
 ];
 
 const HANDOFF: [RegExp, HandoffReason, string][] = [
-  [t(String.raw`\b(talk|speak|chat)\s+(to|with)\s+(a\s+|an\s+|some\s*one|real\s+|live\s+)?(person|human|agent|rep|representative|someone|somebody|operator|manager|supervisor)|\b(real|live)\s+(person|human)\b|\bhuman,? please\b|^\s*(agent|representative|operator)\s*$`), "human_requested", "human_requested"],
+  [t(String.raw`\b(talk|speak|chat)\s+(to|with)\s+(a\s+|an\s+)?(real\s+|live\s+|actual\s+)?(person|human|agent|rep|representative|someone|somebody|operator|manager|supervisor)|\b(want|need|get|give)\s+(me\s+)?(a\s+)?(real|live)\s+(person|human)\b|\bhuman,? please\b|^\s*(agent|representative|operator)\s*$`), "human_requested", "human_requested"],
   [t(String.raw`\b(cancel|reschedul|re-schedul|move|push back|change)\w*\b.{0,40}\b(appointment|visit|booking|tech(nician)? visit)|\bcancel (it|my)|\breschedule\b`), "cancel_reschedule", "cancel_reschedule"],
   [t(String.raw`\b(my|the|this|an?)\s+(bill|invoice|statement|charge|balance)\b|\b(refund|overcharg|double[- ]charg|charged (me|twice)|dispute|payment plan|pay (my|the|an?) (bill|invoice|balance)|past due|collections|card on file|autopay)\b`), "billing_account", "billing"],
   [t(String.raw`\b(my|our)\s+(account|membership (status|renewal date)|renewal date)\b|\bwhen does my membership\b|\bam i (a member|on the plan|covered)\b|\bupdate my (address|phone|email|card)\b`), "billing_account", "account_lookup"],
@@ -29,12 +29,14 @@ const HANDOFF: [RegExp, HandoffReason, string][] = [
   [t(String.raw`\b(complain|complaint|terrible|awful|horrible|unacceptable|furious|ripped off|scam|lawsuit|lawyer|attorney|bbb|better business bureau|damaged my|broke my|rude)\b`), "complaint", "complaint"],
 ];
 
+const ARE_YOU_HUMAN = t(String.raw`\b(are|r) (you|u) (a |an )?(real |actual |live )?(person|human|bot|robot|ai|machine|computer)\b|\bam i (talking|speaking|chatting) (to|with) (a |an )?(real |actual )?(person|human|bot|ai)\b`);
 const INJECTION = t(String.raw`\b(ignore (all |any )?(previous|prior|above) (instructions|rules)|disregard (your|the) (instructions|rules)|system prompt|you are now|developer mode|jailbreak|pretend (to be|you are)|act as (a |an )?(different|unrestricted)|reveal your (prompt|instructions)|\bDAN\b)`);
 
 export function route(text: string): Route {
   for (const [re, r] of SAFETY) if (re.test(text)) return r;
   for (const [re, reason, intent] of HANDOFF) if (re.test(text)) return { kind: "handoff", reason, intent };
   if (INJECTION.test(text)) return { kind: "deflect", script: "injection", intent: "adversarial" };
+  if (ARE_YOU_HUMAN.test(text) && text.length < 160) return { kind: "deflect", script: "ai_disclosure", intent: "ai_disclosure" };
   return { kind: "model" };
 }
 
@@ -44,6 +46,8 @@ export const SCRIPTS = {
     "This could be dangerous. If you smell gas, see sparks or smoke, or a carbon monoxide alarm is sounding, leave the house now and call 911 from outside. If it's gas, also call your gas utility's emergency line. Don't flip switches or run the system. I'm passing this to our team right away. I won't book a regular visit for this.",
   self_harm:
     "I'm really sorry you're going through this. You can call or text 988 to reach the Suicide and Crisis Lifeline any time, day or night. If you're in immediate danger, call 911. I'm also letting a person on our team know.",
+  ai_disclosure:
+    "I'm an AI, Meridian's automated assistant, not a person. I can answer questions about our services, prices, memberships and warranties, and book a visit. If you'd rather talk to a person, just say so.",
   injection:
     "I can only help with Meridian Home Comfort services: questions about our services, prices, memberships and warranties, and booking a visit. What can I help you with?",
 } as const;

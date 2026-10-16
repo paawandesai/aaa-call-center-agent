@@ -5,6 +5,7 @@ import { defaultDeps } from "@/lib/deps";
 import { AgentEvent } from "@/lib/events";
 import { addSpend, allow, overSpendCap } from "@/lib/ratelimit";
 import { whenLabel } from "@/lib/scheduling";
+import { maybeNightlyReset } from "@/lib/reset";
 import { requireSession } from "@/lib/session";
 import { record } from "@/lib/telemetry";
 
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
     if (!r.ok) return Response.json({ error: "rate_limited", retry_after_s: r.retryAfterS }, { status: 429, headers: { "Retry-After": String(r.retryAfterS) } });
   }
 
+  await maybeNightlyReset().catch(() => {});
   const conv = getConversation(session.id, b.conversation_id);
   let text = b.message;
   if (b.action === "human") text = "I'd like to talk to a person, please.";

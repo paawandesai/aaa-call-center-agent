@@ -8,14 +8,12 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && tsx scripts/warm_model.ts",
     "start": "next start -p ${PORT:-3000}",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed_from_sqlite.ts",
-    "db:reset": "tsx scripts/reset.ts",
-    "kb:load": "tsx scripts/load_kb.ts"
+    "db:setup": "tsx scripts/setup_db.ts",
+    "eval": "tsx scripts/run_eval.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
@@ -25,7 +23,6 @@
     "@types/node": "22.20.5",
     "@types/pg": "8.23.1",
     "@types/react": "19.3.0",
-    "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vitest": "5.0.5"
   },
@@ -36,6 +33,7 @@
     "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "tsx": "4.23.15",
     "zod": "4.6.7"
   }
 }
