@@ -44,13 +44,13 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
         CASE WHEN f.rating = 'down' THEN 'caller_feedback' WHEN e.outcome = 'error' THEN 'error'
           WHEN e.reason = 'low_confidence' THEN 'could_have_answered' ELSE 'booking_failed' END AS kind,
         e.session_id, e.intent, e.outcome, e.reason, e.top_score, e.first_token_ms, e.latency_ms, e.meta->>'tools' AS tools,
-        NULL::bigint AS handoff_id, NULL::jsonb AS steps
+        NULL::int AS handoff_id, NULL::jsonb AS steps
       FROM events e LEFT JOIN feedback f ON f.turn_id = e.turn_id
       WHERE e.kind = 'turn' AND (f.rating = 'down' OR e.outcome = 'error' OR e.reason IN ('low_confidence','booking_failed'))
       UNION ALL
       SELECT 'handoff:' || s.handoff_id || ':' || s.flag, s.created_at,
         CASE s.flag WHEN 'summary_wrong' THEN 'summary_wrong' ELSE 'staff_could_have_answered' END,
-        h.session_id, h.intent, 'handoff', h.reason, NULL, NULL, NULL, NULL, h.id, h.steps_tried
+        h.session_id, h.intent, 'handoff', h.reason, NULL, NULL, NULL, NULL, h.id::int, h.steps_tried
       FROM staff_flags s JOIN handoffs h ON h.id = s.handoff_id
     ) x WHERE NOT EXISTS (SELECT 1 FROM reviews r WHERE r.turn_id = x.key)
     ORDER BY ts DESC LIMIT 100`);

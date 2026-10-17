@@ -24,7 +24,7 @@ for (const t of ["I want to talk to a real person", "there's a burning smell com
 for (const w of [1280, 390]) {
   const page = await login(process.env.STAFF ?? "demo-staff-1", w);
   for (const p of ["/staff/handoffs", "/staff/dashboard", "/staff/review", "/evaluation"]) {
-    await page.goto(base + p);
+    await page.goto(base + p, { waitUntil: "networkidle" });
     if (p === "/staff/handoffs" && w === 1280) {
       await page.click("button:has-text('Flag: assistant could have answered')");
       await page.waitForSelector("text=Flagged");

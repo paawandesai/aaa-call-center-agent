@@ -20,7 +20,7 @@ function callerGave(p: Record<string, unknown>): string {
 export default async function Handoffs({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
   if (!(await requireSession("staff"))) redirect("/");
   const q = db();
-  const { rows } = await q.query<H>(`SELECT id, created_at, reason, intent, steps_tried, caller_provided, slot, summary, status FROM handoffs
+  const { rows } = await q.query<H>(`SELECT id::int AS id, created_at, reason, intent, steps_tried, caller_provided, slot, summary, status FROM handoffs
     WHERE created_at > now() - interval '7 days' ORDER BY (status = 'resolved'), (reason = 'safety') DESC, created_at ASC LIMIT 200`);
   const waiting = await openHandoffCount(q);
   const want = Number((await searchParams).id);

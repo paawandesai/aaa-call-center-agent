@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   if (!(await requireSession("staff"))) return Response.json({ error: "unauthorized" }, { status: 401 });
   const { rows } = await db().query(
-    `SELECT id, created_at, reason, intent, steps_tried, caller_provided, slot, summary, status, resolution FROM handoffs
+    `SELECT id::int AS id, created_at, reason, intent, steps_tried, caller_provided, slot, summary, status, resolution FROM handoffs
      WHERE created_at > now() - interval '7 days'
      ORDER BY (status = 'resolved'), (reason = 'safety') DESC, created_at ASC LIMIT 200`);
   return Response.json({ handoffs: rows });
