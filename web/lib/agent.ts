@@ -16,9 +16,9 @@ import { allow } from "./ratelimit";
 
 type Tool = Anthropic.Beta.BetaTool;
 const SERVICE_TYPES = ["hvac_repair", "hvac_tune_up", "plumbing", "estimate"] as const;
-// "self_harm", "medical" and "threat" are model-only labels that pick the script; they are stored as reason safety
-// (threat as adversarial). A plain "safety" handoff shows the script the caller's words match, else a generic urgent one.
-const MODEL_HANDOFF_REASONS = ["safety", "self_harm", "medical", "threat", "billing_account", "cancel_reschedule", "complaint", "human_requested",
+// The safety labels pick the card the caller sees and are stored as reason safety (threat as adversarial). "safety" means
+// gas, CO, fire, smoke or a burning smell: it shows the card the caller's words match, else the gas/CO/fire card.
+const MODEL_HANDOFF_REASONS = ["safety", "electrical", "self_harm", "medical", "threat", "caller_in_danger", "urgent_other", "billing_account", "cancel_reschedule", "complaint", "human_requested",
   "low_confidence", "service_area_unclear", "booking_failed", "out_of_scope"] as const;
 
 // Narrow tools. None of them writes: propose_booking and propose_appointment_change only show a card the caller confirms.
@@ -94,7 +94,7 @@ export const TOOLS: Tool[] = [
     input_schema: {
       type: "object",
       properties: {
-        reason: { type: "string", enum: [...MODEL_HANDOFF_REASONS], description: "safety for gas, carbon monoxide, sparks, smoke, fire, burning smells or electrical hazards; self_harm if the caller talks about hurting themselves or not wanting to live; medical for anyone who may need emergency care; threat for threats of violence" },
+        reason: { type: "string", enum: [...MODEL_HANDOFF_REASONS], description: "safety: gas, carbon monoxide, sparks, smoke, fire or a burning smell. electrical: water near electrical parts, melted or scorched outlets or wires, arcing, shocks. self_harm: the caller talks about hurting themselves or not wanting to live. medical: someone may need emergency care. threat: the caller threatens violence against anyone. caller_in_danger: someone is threatening or hurting the caller, or they are unsafe at home. urgent_other: another emergency that fits none of these." },
         summary: { type: "string", description: "One or two sentences for staff: what the caller needs and what was already tried" },
       },
       required: ["reason", "summary"],
@@ -142,6 +142,7 @@ const INTENT_SUMMARY: Record<string, string> = {
   threat: "This chat has been passed to our team.",
   domestic_violence: "You told me you may not be safe at home. I shared the hotline and asked a person to follow up carefully.",
   urgent: "You told me about something urgent. I marked it for our team right away.",
+  in_danger: "You told me you may be in danger. I asked you to call 911 and marked it urgent for our team.",
   human_requested: "You asked to speak with a person. Your message is in the queue.",
   cancel_reschedule: "You want to change or cancel an existing appointment.",
   billing: "You have a question about a bill, charge or payment.",
@@ -349,16 +350,17 @@ function lockForSafety(c: Conversation, script: SafetyScript) {
 }
 
 async function modelHandoff(deps: Deps, c: Conversation, asked: (typeof MODEL_HANDOFF_REASONS)[number] | HandoffReason, summary: string, text: string, emit: Emit, res: TurnResult) {
-  let script: SafetyScript | undefined;
-  if (asked === "self_harm") script = "self_harm";
-  else if (asked === "medical") script = "medical";
-  else if (asked === "threat") script = "threat";
-  else if (asked === "safety" && !c.safetyLock) {
+  const CARD: Partial<Record<string, SafetyScript>> = { electrical: "electrical", self_harm: "self_harm", medical: "medical", threat: "threat",
+    caller_in_danger: "in_danger", urgent_other: "urgent" };
+  let script: SafetyScript | undefined = CARD[asked];
+  if (asked === "safety") {
     const r = route(text);
-    script = r.kind === "safety" ? r.script : "urgent";
+    script = r.kind === "safety" ? r.script : "gas_co_fire";
   }
+  // In an already locked chat a repeat handoff adds no second card; a new kind of crisis (self-harm, danger) still shows its own.
+  if (c.safetyLock && (asked === "safety" || asked === "urgent_other")) script = undefined;
   // A repeat safety handoff in an already locked chat adds no second card and no second ticket.
-  const reason: HandoffReason = script === "threat" ? "adversarial" : script || asked === "safety" ? "safety" : (asked as HandoffReason);
+  const reason: HandoffReason = script === "threat" || asked === "threat" ? "adversarial" : script || asked in CARD || asked === "safety" ? "safety" : (asked as HandoffReason);
   if (script) {
     lockForSafety(c, script);
     const intent = script === "gas_co_fire" ? "safety" : script;
