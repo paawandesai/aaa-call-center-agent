@@ -21,7 +21,7 @@ export const config = {
   // keeps moving with real time, so the app never offers or books a slot that has already passed.
   nowOverride: process.env.DEMO_NOW,
   clockFloor: process.env.CLOCK_FLOOR,
-  promptVersion: "agent-v7",
+  promptVersion: "agent-v8",
 };
 
 export const now = () => {
