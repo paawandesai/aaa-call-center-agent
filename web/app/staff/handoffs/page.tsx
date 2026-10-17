@@ -8,7 +8,7 @@ import { REASON_LABEL, REASON_WHY, handoffTitle, waitingLabel } from "@/lib/staf
 
 export const dynamic = "force-dynamic";
 
-interface H { id: number; created_at: Date; reason: string; intent: string | null; steps_tried: string[]; caller_provided: Record<string, unknown>; slot: unknown; summary: string; status: string }
+interface H { id: number; demo: boolean; created_at: Date; reason: string; intent: string | null; steps_tried: string[]; caller_provided: Record<string, unknown>; slot: unknown; summary: string; status: string }
 
 const STATUS_TAG: Record<string, string> = { open: "Waiting", claimed: "Claimed", resolved: "Resolved" };
 
@@ -20,7 +20,7 @@ function callerGave(p: Record<string, unknown>): string {
 export default async function Handoffs({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
   if (!(await requireSession("staff"))) redirect("/");
   const q = db();
-  const { rows } = await q.query<H>(`SELECT id::int AS id, created_at, reason, intent, steps_tried, caller_provided, slot, summary, status FROM handoffs
+  const { rows } = await q.query<H>(`SELECT id::int AS id, session_id LIKE 'demo\_%' AS demo, created_at, reason, intent, steps_tried, caller_provided, slot, summary, status FROM handoffs
     WHERE created_at > now() - interval '7 days' ORDER BY (status = 'resolved'), (reason = 'safety') DESC, created_at ASC LIMIT 200`);
   const waiting = await openHandoffCount(q);
   const want = Number((await searchParams).id);
@@ -43,7 +43,7 @@ export default async function Handoffs({ searchParams }: { searchParams: Promise
                       <span className="row"><span style={{ fontWeight: 600 }}>{handoffTitle(h.reason, h.intent)}</span><span className="mono small muted">{waitingLabel(new Date(h.created_at))}</span></span>
                       <span className="tags">
                         <span className={`tag${h.reason === "safety" ? " danger" : ""}`}>{h.reason === "safety" ? "Safety · script sent" : REASON_LABEL[h.reason] ?? h.reason}</span>
-                        <span className="tag">Chat</span>
+                        <span className="tag">{h.demo ? "Demo data" : "Chat"}</span>
                         {h.status !== "open" && <span className="tag">{STATUS_TAG[h.status]}</span>}
                       </span>
                     </a>

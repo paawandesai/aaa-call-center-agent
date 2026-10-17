@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SignOut } from "./SignOut";
 import type { AgentEvent } from "@/lib/events";
 
 type SlotT = Extract<AgentEvent, { type: "slots" }>["slots"][number];
@@ -23,7 +24,7 @@ const ERRORS: Record<string, string> = {
   turn_in_progress: "I'm still answering your last message.",
 };
 
-export function Chat() {
+export function Chat({ role = "caller" }: { role?: "caller" | "staff" }) {
   const [items, setItems] = useState<Item[]>([{ id: "greet", kind: "assistant", text: GREETING, turnId: "greeting" }]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -181,6 +182,8 @@ export function Chat() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn" disabled={busy} onClick={() => void run({ action: "human" }, "Talk to a person")}>Talk to a person</button>
           <button className="btn btn-quiet" onClick={() => { abort.current?.abort(); setConversationId(rid()); setItems([{ id: "greet", kind: "assistant", text: GREETING, turnId: "greeting" }]); }}>New chat</button>
+          {role === "staff" && <a className="btn btn-quiet" href="/staff/handoffs" style={{ textDecoration: "none" }}>Staff console</a>}
+          <SignOut />
         </div>
       </header>
 

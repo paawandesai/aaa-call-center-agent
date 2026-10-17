@@ -70,6 +70,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             {RANGES.map(([id, label]) => <a key={id} href={`?range=${id}`} aria-current={range[0] === id ? "true" : undefined}>{label}</a>)}
           </nav>
         </div>
+        <p className="muted small" style={{ margin: 0 }}>Includes synthetic demo activity, regenerated nightly, so the console has something to show. Real chats are counted alongside it.</p>
         {thin && <p className="muted" style={{ margin: 0 }}>Fewer than 20 conversations in this range, so treat these rates as too few to judge.</p>}
 
         <div className="tiles">

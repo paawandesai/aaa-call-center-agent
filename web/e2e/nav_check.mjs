@@ -1,0 +1,30 @@
+// Manual check of sign-in navigation and the seeded demo activity against a local server (no model calls).
+// Screenshots go to $SHOTS.
+import { chromium } from "@playwright/test";
+const base = process.env.BASE ?? "http://localhost:3100";
+const shots = process.env.SHOTS ?? ".";
+const b = await chromium.launch({ executablePath: process.env.CHROME ?? "/opt/pw-browsers/chromium" });
+const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+await p.goto(base + "/");
+await p.fill("#code", process.env.STAFF ?? "demo-staff-1");
+await p.check("input[type=checkbox]");
+await p.click("button[type=submit]");
+await p.waitForURL(/\/(chat|staff)/);
+console.log("after sign-in:", new URL(p.url()).pathname);
+await p.goto(base + "/");
+console.log("home while signed in shows card:", await p.getByText("You're signed in").count() > 0);
+await p.screenshot({ path: `${shots}/home_signed_in.png` });
+await p.goto(base + "/staff/handoffs", { waitUntil: "networkidle" });
+console.log("demo-tagged handoffs:", await p.getByText("Demo data").count());
+await p.screenshot({ path: `${shots}/handoffs_demo.png` });
+await p.goto(base + "/staff/dashboard", { waitUntil: "networkidle" });
+await p.screenshot({ path: `${shots}/dashboard_demo.png`, fullPage: true });
+await p.goto(base + "/staff/review", { waitUntil: "networkidle" });
+await p.screenshot({ path: `${shots}/review_demo.png`, fullPage: true });
+await p.goto(base + "/chat", { waitUntil: "networkidle" });
+await p.getByRole("button", { name: /sign out/i }).first().click();
+await p.waitForURL(base + "/");
+console.log("after sign-out shows code form:", await p.locator("#code").count() === 1);
+await p.goto(base + "/chat");
+console.log("chat after sign-out redirects home:", new URL(p.url()).pathname === "/");
+await b.close();

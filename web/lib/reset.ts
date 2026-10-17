@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { seedDemoActivity } from "./demoseed";
 import { resetLiveTables } from "./seed";
 
 // Nightly reset at 03:00 Central, run lazily by the first request after that time (single instance).
@@ -21,6 +22,7 @@ export async function maybeNightlyReset() {
     await d.query(`DELETE FROM handoffs WHERE created_at < now() - interval '7 days'`);
     await d.query(`DELETE FROM feedback WHERE created_at < now() - interval '30 days'`);
     await d.query(`DELETE FROM staff_flags WHERE created_at < now() - interval '30 days'`);
+    if (process.env.DEMO_ACTIVITY !== "0") await seedDemoActivity(d);
   } finally {
     await d.query(`SELECT pg_advisory_unlock(424242)`);
   }

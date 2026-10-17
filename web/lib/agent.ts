@@ -179,12 +179,19 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
         },
         { signal },
       );
-      let roundChars = 0;
+      let roundChars = 0, roundText = "", noteChecked = false;
       const hadFirstToken = res.firstTokenMs !== undefined;
       stream.on("text", (delta) => {
         res.firstTokenMs ??= Date.now() - started;
         roundChars += delta.length;
+        roundText += delta;
         emit({ type: "text_delta", text: delta });
+        // A short opening paragraph that never addresses the caller is a note to self ("Need ZIP first."): take it back.
+        const cut = roundText.indexOf("\n\n");
+        if (!noteChecked && cut >= 0) {
+          noteChecked = true;
+          if (isSelfNote(roundText.slice(0, cut))) { emit({ type: "text_discard", chars: roundChars }); roundChars = roundText.length - cut - 2; emit({ type: "text_delta", text: roundText.slice(cut + 2) }); }
+        }
       });
       const msg = await stream.finalMessage();
       // Text written alongside a tool call is the model thinking aloud, not a reply; take it back off the screen.
@@ -243,6 +250,10 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     if (sources.length) emit({ type: "sources", sources });
   }
   return res;
+}
+
+export function isSelfNote(p: string): boolean {
+  return p.length <= 120 && !/\b(I|I'm|I'll|I've|you|your|you're|we|we're|our|Meridian|sorry|thanks|hi|hello)\b/i.test(p);
 }
 
 // Short replies to the assistant's booking questions: a ZIP, a slot pick from the buttons, or a name.

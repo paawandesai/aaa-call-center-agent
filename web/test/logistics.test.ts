@@ -9,3 +9,13 @@ describe("isLogistics (turns that skip the KB search)", () => {
     for (const t of ["What's your diagnostic fee?", "Do you service 78734?", "my furnace won't turn on", "How much is a tune-up for 78745 Austin?"]) expect(isLogistics(t)).toBe(false);
   });
 });
+
+import { isSelfNote } from "../lib/agent";
+describe("isSelfNote (model notes withdrawn from the screen)", () => {
+  it("catches notes to self", () => {
+    for (const t of ["Need ZIP first. Could offer quick checks briefly.", "Passages are empty, so search the knowledge base.", "Furnace not turning on is hvac_repair."]) expect(isSelfNote(t)).toBe(true);
+  });
+  it("keeps replies to the caller", () => {
+    for (const t of ["I'm sorry your AC stopped working.", "Good news, we serve 78745.", "Yes, the diagnostic fee is $89 and you can book online."]) expect(isSelfNote(t)).toBe(false);
+  });
+});

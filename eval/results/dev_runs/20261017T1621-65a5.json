@@ -1,0 +1,292 @@
+{
+ "run_id": "20261017T1621-65a5",
+ "created_at": "2026-10-17T16:21:14.298Z",
+ "config_id": "564d387eb7",
+ "prompt_version": "agent-v3",
+ "split": "dev",
+ "demo_now": "2026-10-16T15:00:00Z",
+ "tokens": {
+  "input": 1100216,
+  "output": 33824,
+  "uncached_input": 980,
+  "cache_read": 1007469,
+  "cache_write": 91767,
+  "est_cost_usd": 1.34,
+  "est_cost_per_case_usd": 0.0134
+ },
+ "holdout": {
+  "n": 100,
+  "containment": {
+   "k": 37,
+   "n": 100,
+   "rate": 0.37,
+   "ci": [
+    0.28182212569509163,
+    0.46779652424866885
+   ]
+  },
+  "contained_any": {
+   "k": 47,
+   "n": 100,
+   "rate": 0.47,
+   "ci": [
+    0.3751065198210374,
+    0.5671131686275227
+   ]
+  },
+  "ceiling": {
+   "k": 48,
+   "n": 100,
+   "rate": 0.48,
+   "ci": [
+    0.38464384320080547,
+    0.5768359490982345
+   ]
+  },
+  "accuracy": {
+   "k": 37,
+   "n": 48,
+   "rate": 0.7708333333333334,
+   "ci": [
+    0.6346046409154885,
+    0.8669230897101096
+   ]
+  },
+  "escalation": {
+   "precision": {
+    "k": 51,
+    "n": 53,
+    "rate": 0.9622641509433962,
+    "ci": [
+     0.8724547684904087,
+     0.9895899311661807
+    ]
+   },
+   "recall": {
+    "k": 51,
+    "n": 52,
+    "rate": 0.9807692307692307,
+    "ci": [
+     0.8987925373197556,
+     0.9965972795909344
+    ]
+   }
+  },
+  "safety": {
+   "k": 6,
+   "n": 6,
+   "rate": 1,
+   "ci": [
+    0.6096569663469354,
+    0.9999999999999999
+   ]
+  },
+  "per_driver": [
+   {
+    "driver": "Billing and payments",
+    "n": 22,
+    "contained": 0,
+    "correct": 22,
+    "failed": []
+   },
+   {
+    "driver": "Complaint / escalation request",
+    "n": 5,
+    "contained": 0,
+    "correct": 5,
+    "failed": []
+   },
+   {
+    "driver": "Existing appointment",
+    "n": 8,
+    "contained": 0,
+    "correct": 8,
+    "failed": []
+   },
+   {
+    "driver": "Membership (Comfort Club)",
+    "n": 14,
+    "contained": 9,
+    "correct": 11,
+    "failed": [
+     "101558ff74",
+     "2cc9e4b159",
+     "2f8c9f82c2"
+    ]
+   },
+   {
+    "driver": "Other (redirect)",
+    "n": 3,
+    "contained": 1,
+    "correct": 3,
+    "failed": []
+   },
+   {
+    "driver": "Repair / service booking",
+    "n": 27,
+    "contained": 23,
+    "correct": 26,
+    "failed": [
+     "0cb3337579"
+    ]
+   },
+   {
+    "driver": "Safety emergency",
+    "n": 6,
+    "contained": 0,
+    "correct": 6,
+    "failed": []
+   },
+   {
+    "driver": "System replacement estimate",
+    "n": 3,
+    "contained": 1,
+    "correct": 1,
+    "failed": [
+     "02da308cfb",
+     "25aed55433"
+    ]
+   },
+   {
+    "driver": "Warranty",
+    "n": 12,
+    "contained": 3,
+    "correct": 6,
+    "failed": [
+     "0a555ca72a",
+     "0c3fc0f8fc",
+     "13f5ceab24",
+     "20fce13639",
+     "22a95cf433",
+     "34c4855726"
+    ]
+   }
+  ],
+  "failures": [
+   {
+    "id": "02da308cfb",
+    "driver": "System replacement estimate",
+    "expected": "booked",
+    "got": "answered",
+    "checks": [
+     "expected a booking, got answered"
+    ]
+   },
+   {
+    "id": "0a555ca72a",
+    "driver": "Warranty",
+    "expected": "handoff",
+    "got": "answered",
+    "checks": [
+     "expected a handoff, got answered"
+    ]
+   },
+   {
+    "id": "0c3fc0f8fc",
+    "driver": "Warranty",
+    "expected": "answered",
+    "got": "booked",
+    "checks": [
+     "required fact missing",
+     "expected an answer, got booked"
+    ]
+   },
+   {
+    "id": "0cb3337579",
+    "driver": "Repair / service booking",
+    "expected": "booked",
+    "got": "handoff:booking_failed",
+    "checks": [
+     "expected a booking, got handoff (booking_failed)"
+    ]
+   },
+   {
+    "id": "101558ff74",
+    "driver": "Membership (Comfort Club)",
+    "expected": "answered",
+    "got": "booked",
+    "checks": [
+     "required fact missing",
+     "expected an answer, got booked"
+    ]
+   },
+   {
+    "id": "13f5ceab24",
+    "driver": "Warranty",
+    "expected": "answered",
+    "got": "booked",
+    "checks": [
+     "expected an answer, got booked"
+    ]
+   },
+   {
+    "id": "20fce13639",
+    "driver": "Warranty",
+    "expected": "booked",
+    "got": "answered",
+    "checks": [
+     "expected a booking, got answered"
+    ]
+   },
+   {
+    "id": "22a95cf433",
+    "driver": "Warranty",
+    "expected": "booked",
+    "got": "answered",
+    "checks": [
+     "expected a booking, got answered"
+    ]
+   },
+   {
+    "id": "25aed55433",
+    "driver": "System replacement estimate",
+    "expected": "booked",
+    "got": "answered",
+    "checks": [
+     "expected a booking, got answered"
+    ]
+   },
+   {
+    "id": "2cc9e4b159",
+    "driver": "Membership (Comfort Club)",
+    "expected": "answered",
+    "got": "answered",
+    "checks": [
+     "required fact missing"
+    ]
+   },
+   {
+    "id": "2f8c9f82c2",
+    "driver": "Membership (Comfort Club)",
+    "expected": "answered",
+    "got": "handoff:booking_failed",
+    "checks": [
+     "expected an answer, got handoff (booking_failed)"
+    ]
+   },
+   {
+    "id": "34c4855726",
+    "driver": "Warranty",
+    "expected": "answered",
+    "got": "booked",
+    "checks": [
+     "expected an answer, got booked"
+    ]
+   }
+  ]
+ },
+ "retrieval": {
+  "hit5": {
+   "k": 23,
+   "n": 24,
+   "rate": 0.9583333333333334,
+   "ci": [
+    0.7975777375115778,
+    0.992606734645195
+   ]
+  },
+  "mrr": 0.8347222222222223,
+  "where": "app query on pgvector (PGlite), dev set"
+ },
+ "note": "agent-v3 prompt + conversation caching + logistics skip + merged holiday chunk, Opus 5.5"
+}

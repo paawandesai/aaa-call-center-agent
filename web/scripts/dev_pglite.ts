@@ -1,5 +1,6 @@
 // Local development and browser tests only: in-process Postgres seeded from the mock DB and KB chunks.
 import path from "node:path";
+import { seedDemoActivity } from "../lib/demoseed";
 import { loadKb } from "../lib/kbload";
 import { migrate } from "../lib/migrate";
 import { loadSeedFromSqlite } from "../lib/seed";
@@ -11,5 +12,6 @@ export async function devDb() {
   const data = process.env.MERIDIAN_DATA_DIR ?? "/mnt/project-files/data/meridian_dataset";
   await loadSeedFromSqlite(d, path.join(data, "scheduling_db/meridian_scheduling.sqlite"));
   await loadKb(d, process.env.KB_CHUNKS ?? "/mnt/project-files/data/kb/chunks.json");
+  if (process.env.DEMO_ACTIVITY !== "0") await seedDemoActivity(d);
   return d;
 }

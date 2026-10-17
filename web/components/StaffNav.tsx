@@ -1,3 +1,5 @@
+import { SignOut } from "./SignOut";
+
 const LINKS: [string, string][] = [["/staff/handoffs", "Handoffs"], ["/staff/dashboard", "Dashboard"], ["/staff/review", "Review queue"], ["/evaluation", "Evaluation"], ["/chat", "Chat"]];
 
 // Matches the canvas staff nav. `waiting` is the open handoff count shown next to Handoffs.
@@ -11,6 +13,7 @@ export function StaffNav({ current, waiting, staff = true }: { current: string; 
           {label}{href === "/staff/handoffs" && waiting ? <span className="count" aria-label={`${waiting} waiting`}>{waiting}</span> : null}
         </a>
       ))}
+      <span style={{ marginLeft: "auto" }}><SignOut className="btn btn-quiet" /></span>
     </nav>
   );
 }

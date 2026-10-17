@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { allow } from "@/lib/ratelimit";
-import { COOKIE, createSession, roleForCode } from "@/lib/session";
+import { db } from "@/lib/db";
+import { COOKIE, createSession, requireSession, roleForCode } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,5 +16,14 @@ export async function POST(req: Request) {
   const s = await createSession(role);
   const res = Response.json({ role });
   res.headers.append("Set-Cookie", `${COOKIE}=${s.value}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${s.maxAge}`);
+  return res;
+}
+
+// Sign out: end the session row and clear the cookie, so the invite page shows again.
+export async function DELETE() {
+  const s = await requireSession();
+  if (s) await db().query(`DELETE FROM sessions WHERE session_id = $1`, [s.id]);
+  const res = Response.json({ ok: true });
+  res.headers.append("Set-Cookie", `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`);
   return res;
 }
