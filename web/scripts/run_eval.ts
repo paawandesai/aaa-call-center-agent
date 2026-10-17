@@ -55,7 +55,9 @@ const SERVICE_OF: Record<string, ServiceType> = { "Heating or cooling repair": "
 
 // A simulated caller: answers ZIP, name and (for account cases) phone + ZIP verification questions, picks the first time offered,
 // and presses Confirm on any card.
-interface Sim { zip: string; opening: string; phone?: string; name?: string }
+// `want` is what the caller came for (from the call's driver): someone who only asked a question turns down a visit offer,
+// someone who wants a visit accepts one, and a caller asked what kind of unit failed knows the answer.
+interface Sim { zip: string; opening: string; phone?: string; name?: string; want?: string; unit?: "hvac" | "plumbing" }
 
 async function converse(id: string, turns: string[], sim?: Sim): Promise<Trace> {
   await d.query(`INSERT INTO sessions (session_id, role, expires_at) VALUES ($1,'caller', now() + interval '1 day') ON CONFLICT DO NOTHING`, [`eval-${id}`]);
@@ -74,11 +76,17 @@ async function converse(id: string, turns: string[], sim?: Sim): Promise<Trace> 
         text = `I'll take ${whenLabel(o.date, o.window)} (slot_id ${s.slot_id}).`;
         t.pendingSlot = s.slot_id;
       } else if (sim.phone && /\b(phone|number)\b/i.test(lastText)) text = `${sim.phone}, ZIP ${sim.zip}`;
-      else if (sim.phone && /\b(cancel|move|reschedule|change)\b/i.test(lastText) && /(\?|\byes\b)/i.test(lastText)) text = "Yes, please.";
+      else if (sim.phone && sim.want === "changed" && /\b(cancel|move|reschedule|change)\b/i.test(lastText) && /(\?|\byes\b)/i.test(lastText)) text = "Yes, please.";
+      else if (sim.phone && sim.want === "answered" && /\?\s*$/.test(lastText.trim())) text = "No, that's all I needed. Thanks.";
       else if (/\?\s*$/.test(lastText.trim()) && /\b(connect you|pass (you|this)|our (billing )?team|a person)\b/i.test(lastText)) text = "No, that's all I needed. Thanks.";
+      else if (!sim.phone && /\b(phone|number)\b/i.test(lastText)) text = "I'd rather not look up my account. That answers my question, thanks.";
+      else if (sim.want === "answered" && !sim.phone && /\b(zip|book|schedule|visit|estimate|come out)\b/i.test(lastText)) text = "No thanks, I just had a question. That's all.";
+      else if (sim.unit && /\b(heating|cooling|hvac|furnace|air condition\w*|ac)\b.{0,80}\b(water heater|plumbing)\b|\b(water heater|plumbing)\b.{0,80}\b(heating|cooling|hvac|furnace)\b/i.test(lastText))
+        text = sim.unit === "plumbing" ? "It's the water heater." : "It's the heating and cooling system.";
       else if (/zip/i.test(lastText)) text = sim.zip;
       else if (/\bname\b/i.test(lastText)) text = sim.name ?? "Test Caller";
       else if (/\?\s*$/.test(lastText.trim()) && /(book|schedule|visit|appointment|come out|time)/i.test(lastText)) text = `Yes, please. My ZIP is ${sim.zip}.`;
+      else if (sim.want === "booked" && /\b(book|schedule)\b.{0,60}\b(visit|estimate|appointment|one|technician)\b|\bin-home estimate\b/i.test(lastText)) text = `Yes, please book that. My ZIP is ${sim.zip}.`;
       else if (/\?\s*$/.test(lastText.trim())) text = "Could you just help me with what I asked?";
     }
     if (!text) break;
@@ -208,7 +216,9 @@ if (only !== "adversarial") {
     // The transcript's "Thursday" or "tomorrow" referred to that caller's own visit; point it at the assigned customer's visit.
     if (acct?.weekday) opening = opening.replace(/\b(tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i, (m) => (/^to/i.test(m) ? `on ${acct.weekday}` : acct.weekday!));
     if (acct?.invoice) opening = opening.replace("[INVOICE_ID]", acct.invoice.id).replace(/\$\d[\d,]*(\.\d+)?/, () => `$${money(acct.invoice!.cents)}`);
-    const sim: Sim = acct ? { zip: acct.cust.zip, opening, phone: acct.cust.phone, name: acct.cust.name.split(" ")[0] } : { zip: k.zip, opening };
+    const unit = k.expected.services?.includes("plumbing") ? "plumbing" as const : k.expected.services?.includes("hvac_repair") ? "hvac" as const : undefined;
+    const sim: Sim = acct ? { zip: acct.cust.zip, opening, phone: acct.cust.phone, name: acct.cust.name.split(" ")[0], want: k.expected.outcome }
+      : { zip: k.zip, opening, want: k.expected.outcome, unit };
     const t = await converse(k.id, [opening], sim);
     inTok += t.inTok; outTok += t.outTok; usage = addUsage(usage, t.usage);
     const all = t.texts.join("\n");

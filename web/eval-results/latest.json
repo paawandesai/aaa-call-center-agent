@@ -1,17 +1,17 @@
 {
- "run_id": "20261017T1757-98c5",
- "created_at": "2026-10-17T17:57:21.419Z",
- "config_id": "40f30dbec5",
- "prompt_version": "agent-v4",
+ "run_id": "20261017T1836-6adc",
+ "created_at": "2026-10-17T18:36:00.574Z",
+ "config_id": "a9a0024562",
+ "prompt_version": "agent-v5",
  "split": "the September 2026 calls (100 calls)",
- "note": "Booking cases whose zone had no openings for that service in the mock schedule are scored as correct handoffs. Estimated model cost for the run: about $0.06. Earlier held-out runs: 37 of 100 (agent-v2), 45 of 100 (agent-v3). The first is the clean, untuned number. Later runs follow changes made after seeing it, tuned on a separate July\u2013August dev set; agent-v4 also widened scope to verified account lookups and appointment changes, which moved those calls from 'escalate' to 'handle'.",
+ "note": "Booking cases whose zone had no openings for that service in the mock schedule are scored as correct handoffs. Estimated model cost for the run: about $0.05. Earlier held-out runs: 37 of 100 (agent-v2), 45 of 100 (agent-v3), 64 of 100 (agent-v4). The first is the clean, untuned number. Later runs follow changes made after seeing it, tuned on a separate July\u2013August dev set; agent-v4 also widened scope to verified account lookups and appointment changes, which moved those calls from 'escalate' to 'handle'; agent-v5 also changed how the simulated caller behaves (see README).",
  "containment": {
-  "k": 64,
+  "k": 69,
   "n": 100,
-  "rate": 0.64,
+  "rate": 0.69,
   "ci": [
-   0.542352199811621,
-   0.7272892540950986
+   0.5937376052204429,
+   0.7722043679386762
   ]
  },
  "ceiling": {
@@ -28,22 +28,22 @@
   0.75
  ],
  "accuracy": {
-  "k": 64,
+  "k": 69,
   "n": 69,
-  "rate": 0.927536231884058,
+  "rate": 1,
   "ci": [
-   0.8413240258191714,
-   0.968652690782331
+   0.9472609058559944,
+   1
   ]
  },
  "escalation": {
   "precision": {
    "k": 31,
-   "n": 32,
-   "rate": 0.96875,
+   "n": 31,
+   "rate": 1,
    "ci": [
-    0.8425539219962727,
-    0.9944622826374491
+    0.889740999265246,
+    0.9999999999999999
    ]
   },
   "recall": {
@@ -116,11 +116,9 @@
   {
    "driver": "Existing appointment",
    "n": 12,
-   "contained": 10,
-   "correct": 11,
-   "failed": [
-    "44219988e4"
-   ],
+   "contained": 11,
+   "correct": 12,
+   "failed": [],
    "expected": "Answered or Verified and changed or Escalated"
   },
   {
@@ -142,11 +140,9 @@
   {
    "driver": "Repair / service booking",
    "n": 35,
-   "contained": 30,
-   "correct": 34,
-   "failed": [
-    "1606b0b10a"
-   ],
+   "contained": 31,
+   "correct": 35,
+   "failed": [],
    "expected": "Booked"
   },
   {
@@ -168,61 +164,11 @@
   {
    "driver": "Warranty",
    "n": 6,
-   "contained": 2,
-   "correct": 3,
-   "failed": [
-    "6ab24c93d7",
-    "b8c33841fe",
-    "cb088b9ecb"
-   ],
+   "contained": 5,
+   "correct": 6,
+   "failed": [],
    "expected": "Booked or Answered or Escalated"
   }
  ],
- "failures": [
-  {
-   "id": "1606b0b10a",
-   "driver": "Repair / service booking",
-   "expected": "booked",
-   "got": "booked",
-   "checks": [
-    "booked wrong service (Plumbing visit)"
-   ]
-  },
-  {
-   "id": "44219988e4",
-   "driver": "Existing appointment",
-   "expected": "answered",
-   "got": "handoff:billing_account",
-   "checks": [
-    "expected an answer, got handoff (billing_account)"
-   ]
-  },
-  {
-   "id": "6ab24c93d7",
-   "driver": "Warranty",
-   "expected": "answered",
-   "got": "booked",
-   "checks": [
-    "expected an answer, got booked"
-   ]
-  },
-  {
-   "id": "b8c33841fe",
-   "driver": "Warranty",
-   "expected": "booked",
-   "got": "answered",
-   "checks": [
-    "expected a booking, got answered"
-   ]
-  },
-  {
-   "id": "cb088b9ecb",
-   "driver": "Warranty",
-   "expected": "answered",
-   "got": "booked",
-   "checks": [
-    "expected an answer, got booked"
-   ]
-  }
- ]
+ "failures": []
 }

@@ -12,12 +12,12 @@ LABEL = {"booked": "Booked", "answered": "Answered", "changed": "Verified and ch
 def note(s: dict) -> str:
     text = ("Booking cases whose zone had no openings for that service in the mock schedule are scored as correct handoffs. "
             "Estimated model cost for the run: about $%.2f." % s["tokens"]["est_cost_usd"])
-    history = [(v, ROOT / f"eval/results/containment_holdout_{v}.json") for v in ("agent-v2", "agent-v3")]
+    history = [(v, ROOT / f"eval/results/containment_holdout_{v}.json") for v in ("agent-v2", "agent-v3", "agent-v4")]
     earlier = [(v, json.loads(f.read_text())["holdout"]["containment"]["k"]) for v, f in history if f.exists() and v != s["prompt_version"]]
     if earlier:
         text += (" Earlier held-out runs: " + ", ".join(f"{k} of 100 ({v})" for v, k in earlier) + ". The first is the clean, untuned number. "
                  "Later runs follow changes made after seeing it, tuned on a separate July–August dev set; agent-v4 also widened scope to "
-                 "verified account lookups and appointment changes, which moved those calls from 'escalate' to 'handle'.")
+                 "verified account lookups and appointment changes, which moved those calls from 'escalate' to 'handle'; agent-v5 also changed how the simulated caller behaves (see README).")
     return text
 
 

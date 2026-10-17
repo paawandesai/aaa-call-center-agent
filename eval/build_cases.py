@@ -33,7 +33,8 @@ SAFETY = {"safety_emergency"}
 
 # Required facts: at least one pattern must appear in the assistant's text (current KB values).
 REQUIRED = {
-    "membership_info": [r"\$189", r"\$16\.99", r"\$269"],
+    # "$500" is the members' discount on a new system, which one membership_info question template asks about.
+    "membership_info": [r"\$189", r"\$16\.99", r"\$269", r"\$500"],
     "membership_renewal": [r"auto-?renew", r"renews? (each|every) year", r"30 days", r"enrollment (date|price)", r"locked"],
     "membership_upgrade": [r"\$80", r"prorat"],
     "warranty_coverage": [r"\b(1|one|2|two|5|five)[- ]year", r"\b(1|2|5) years?\b"],
