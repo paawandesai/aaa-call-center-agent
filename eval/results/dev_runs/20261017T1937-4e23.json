@@ -1,0 +1,178 @@
+{
+ "run_id": "20261017T1937-4e23",
+ "created_at": "2026-10-17T19:37:56.156Z",
+ "config_id": "b69f81f3df",
+ "prompt_version": "agent-v6",
+ "split": "dev",
+ "demo_now": "2026-10-16T15:00:00Z",
+ "tokens": {
+  "input": 2400121,
+  "output": 43574,
+  "uncached_input": 1428,
+  "cache_read": 2278813,
+  "cache_write": 119880,
+  "est_cost_usd": 0.06,
+  "est_cost_per_case_usd": 0.0005
+ },
+ "holdout": {
+  "n": 130,
+  "containment": {
+   "k": 83,
+   "n": 130,
+   "rate": 0.6384615384615384,
+   "ci": [
+    0.5529939829593464,
+    0.7159806856040896
+   ]
+  },
+  "contained_any": {
+   "k": 84,
+   "n": 130,
+   "rate": 0.6461538461538462,
+   "ci": [
+    0.5608408523902514,
+    0.7230768533155979
+   ]
+  },
+  "ceiling": {
+   "k": 84,
+   "n": 130,
+   "rate": 0.6461538461538462,
+   "ci": [
+    0.5608408523902514,
+    0.7230768533155979
+   ]
+  },
+  "accuracy": {
+   "k": 83,
+   "n": 84,
+   "rate": 0.9880952380952381,
+   "ci": [
+    0.9356030079821146,
+    0.9978954710984119
+   ]
+  },
+  "escalation": {
+   "precision": {
+    "k": 46,
+    "n": 46,
+    "rate": 1,
+    "ci": [
+     0.9229238226702192,
+     1
+    ]
+   },
+   "recall": {
+    "k": 46,
+    "n": 46,
+    "rate": 1,
+    "ci": [
+     0.9229238226702192,
+     1
+    ]
+   }
+  },
+  "safety": {
+   "k": 6,
+   "n": 6,
+   "rate": 1,
+   "ci": [
+    0.6096569663469354,
+    0.9999999999999999
+   ]
+  },
+  "booking_relabelled_for_coverage_gap": 3,
+  "per_driver": [
+   {
+    "driver": "Billing and payments",
+    "n": 40,
+    "contained": 18,
+    "correct": 40,
+    "failed": []
+   },
+   {
+    "driver": "Complaint / escalation request",
+    "n": 5,
+    "contained": 0,
+    "correct": 5,
+    "failed": []
+   },
+   {
+    "driver": "Existing appointment",
+    "n": 20,
+    "contained": 18,
+    "correct": 20,
+    "failed": []
+   },
+   {
+    "driver": "Membership (Comfort Club)",
+    "n": 14,
+    "contained": 12,
+    "correct": 14,
+    "failed": []
+   },
+   {
+    "driver": "Other (redirect)",
+    "n": 3,
+    "contained": 1,
+    "correct": 3,
+    "failed": []
+   },
+   {
+    "driver": "Repair / service booking",
+    "n": 27,
+    "contained": 24,
+    "correct": 27,
+    "failed": []
+   },
+   {
+    "driver": "Safety emergency",
+    "n": 6,
+    "contained": 0,
+    "correct": 6,
+    "failed": []
+   },
+   {
+    "driver": "System replacement estimate",
+    "n": 3,
+    "contained": 3,
+    "correct": 3,
+    "failed": []
+   },
+   {
+    "driver": "Warranty",
+    "n": 12,
+    "contained": 7,
+    "correct": 11,
+    "failed": [
+     "0c3fc0f8fc"
+    ]
+   }
+  ],
+  "failures": [
+   {
+    "id": "0c3fc0f8fc",
+    "driver": "Warranty",
+    "expected": "answered",
+    "got": "answered",
+    "checks": [
+     "required fact missing"
+    ]
+   }
+  ]
+ },
+ "retrieval": {
+  "hit5": {
+   "k": 23,
+   "n": 24,
+   "rate": 0.9583333333333334,
+   "ci": [
+    0.7975777375115778,
+    0.992606734645195
+   ]
+  },
+  "mrr": 0.8347222222222223,
+  "where": "app query on pgvector (PGlite), dev set"
+ },
+ "note": ""
+}
