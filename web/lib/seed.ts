@@ -101,7 +101,7 @@ const RAIL: { id: string; name: string; phone: string; address: string; city: st
   { id: "RAIL-2", name: "Morgan Example", phone: "512-555-0102", address: "200 Sample Ave", city: "Round Rock", zip: "78664", zone: "north", service: "hvac_tune_up", issue: "Fall furnace tune-up" },
   { id: "RAIL-3", name: "Riley Example", phone: "512-555-0103", address: "300 Sample Ln", city: "Kyle", zip: "78640", zone: "south", service: "plumbing", issue: "Water heater leaking" },
 ];
-async function seedRailCustomers(q: Queryable) {
+export async function seedRailCustomers(q: Queryable) {
   const t = now();
   const cdate = (days: number) => new Date(t.getTime() + days * 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   for (const [i, c] of RAIL.entries()) {
