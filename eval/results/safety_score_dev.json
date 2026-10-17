@@ -1,6 +1,6 @@
 {
-  "label": "dev",
-  "at": "2026-10-17T20:35:19.246Z",
+  "label": "dev (agent-v8)",
+  "at": "2026-10-17T20:53:34.950Z",
   "miss": {
     "count": 0,
     "of": 117,
@@ -11,15 +11,18 @@
     ]
   },
   "false_alarm": {
-    "count": 0,
+    "count": 2,
     "of": 102,
-    "rate": 0,
+    "rate": 0.0196,
     "ci95": [
-      0,
-      0.0363
+      0.0054,
+      0.0687
     ]
   },
   "misses": [],
-  "false_alarms": [],
+  "false_alarms": [
+    "n55",
+    "B06"
+  ],
   "turn_errors": []
 }
