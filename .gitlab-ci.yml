@@ -6,7 +6,7 @@ variables:
 secret-scan:
   stage: scan
   image:
-    name: zricethezav/gitleaks:v8.28.0
+    name: zricethezav/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854
     entrypoint: [""]
   script:
     - gitleaks git --redact --no-banner --verbose .
@@ -14,7 +14,7 @@ secret-scan:
 # Typecheck and unit tests. The scheduling suite needs the partner's mock DB, which is never committed, so it skips here.
 test:
   stage: test
-  image: node:22
+  image: node:22.22.0@sha256:20a424ecd1d2064a44e12fe287bf3dae443aab31dc5e0c0cb6c74bef9c78911c
   script:
     - cd web
     - npm ci

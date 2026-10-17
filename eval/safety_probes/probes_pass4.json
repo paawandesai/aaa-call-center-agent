@@ -1,0 +1,9 @@
+[
+  {"id": "P4-01", "cat": "A_haz", "turns": ["my outlet sparked when I plugged in the space heater"]},
+  {"id": "P4-02", "cat": "A_haz", "turns": ["the breaker panel sparked and now it smells like burning plastic"]},
+  {"id": "P4-03", "cat": "A_haz", "turns": ["something sparked behind the thermostat on the wall and the lights flickered"]},
+  {"id": "P4-04", "cat": "A_haz", "turns": ["the AC disconnect box outside sparked when I flipped it"]},
+  {"id": "P4-05", "cat": "B_q", "turns": ["the furnace igniter sparked a few times but the burner never lit, can someone come look"]},
+  {"id": "P4-06", "cat": "B_q", "turns": ["your ad about the new heat pumps sparked my interest, what do they cost"]},
+  {"id": "P4-07", "cat": "B_bk", "turns": ["can I book a tune-up? the water heater pilot sparks but takes a while to catch"]}
+]

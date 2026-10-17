@@ -38,6 +38,7 @@ export function Chat({ role = "caller", demoIds = [] }: { role?: "caller" | "sta
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [live, setLive] = useState("");
+  const [urgent, setUrgent] = useState(""); // safety scripts, read by a persistent assertive region
   const [conversationId, setConversationId] = useState(rid);
   const abort = useRef<AbortController | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
@@ -123,8 +124,10 @@ export function Chat({ role = "caller", demoIds = [] }: { role?: "caller" | "sta
               break;
             }
             case "safety":
-              // The alert card announces the script itself, so the finished-reply announcement below doesn't repeat it.
+              // Announced once, at once, by the assertive region (screen readers handle a region that is always on the page
+              // more reliably than an inserted alert), so the finished-reply announcement doesn't repeat it.
               setItems((xs) => [...xs, { id: rid(), kind: "safety", text: ev.text }]);
+              setUrgent(ev.text);
               break;
             case "error":
               setItems((xs) => [...xs, { id: rid(), kind: "error", code: ev.code,
@@ -215,7 +218,7 @@ export function Chat({ role = "caller", demoIds = [] }: { role?: "caller" | "sta
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn" disabled={busy} onClick={() => void run({ action: "human" }, "Talk to a person")}>Talk to a person</button>
-          <button className="btn btn-quiet" onClick={() => { abort.current?.abort(); setConversationId(rid()); setItems([{ id: "greet", kind: "assistant", text: GREETING, turnId: "greeting" }]); setLive("New chat started"); composer.current?.focus(); }}>New chat</button>
+          <button className="btn btn-quiet" onClick={() => { abort.current?.abort(); setConversationId(rid()); setItems([{ id: "greet", kind: "assistant", text: GREETING, turnId: "greeting" }]); setLive("New chat started"); setUrgent(""); composer.current?.focus(); }}>New chat</button>
           {role === "staff" && <a className="btn btn-quiet" href="/staff/handoffs" style={{ textDecoration: "none" }}>Staff console</a>}
           <SignOut />
         </div>
@@ -224,9 +227,10 @@ export function Chat({ role = "caller", demoIds = [] }: { role?: "caller" | "sta
       <div className="page chat-body">
         <main className="chat-main">
           <div className="sr-only" aria-live="polite">{live}</div>
+          <div className="sr-only" aria-live="assertive" aria-atomic="true">{urgent}</div>
           <h1 className="sr-only">Chat with Meridian&apos;s automated assistant</h1>
           {/* The log doesn't announce itself (a streamed reply would be read in fragments); the region above reads each
-              finished reply once, and safety scripts are read by their own alert. */}
+              finished reply once, and safety scripts are read by the assertive region. */}
           <div role="log" aria-label="Conversation" aria-live="off" aria-busy={busy} className="log">
             {items.map((it) => <Row key={it.id} it={it} busy={busy} onPick={(s, slotsId) => {
               patch(slotsId, (x) => ({ ...x, picked: s.slot_id, used: true }) as Item);
@@ -426,9 +430,10 @@ function Row({ it, busy, onPick, onConfirm, onConfirmChange, onChangeTime, onRat
         <div className="msg">
           <span className="label">Passed to our team</span>
           <section aria-label="Handoff" className="card handoff">
-            <strong>A person on our team will pick this up.</strong>
+            <strong>{it.data.not_queued ? "This one couldn't be passed to our team." : "A person on our team will pick this up."}</strong>
             <span><span className="muted">{it.data.summary_source === "model" ? "What I've passed on (AI-written): " : "What I've passed on: "}</span>{it.data.summary_for_caller}</span>
             {it.data.queue_position !== undefined && <span className="small muted">Position in the test queue: {it.data.queue_position}</span>}
+            {it.data.not_queued && <span className="small muted">This demo limits how many requests one connection can send to the test queue each day, so this one wasn&apos;t added. Nobody will see it.</span>}
             <span className="small muted">Demo: this is a test queue. No real person will contact you.</span>
           </section>
         </div>
@@ -436,7 +441,7 @@ function Row({ it, busy, onPick, onConfirm, onConfirmChange, onChangeTime, onRat
     case "safety":
       return (
         <div className="msg">
-          <section role="alert" className="card safety">
+          <section aria-label="Safety message" className="card safety">
             <strong className="bad">⚠ Safety first</strong>
             <span>{withCallLinks(it.text)}</span>
           </section>

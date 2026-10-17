@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { now } from "./config";
+import { CLOSED_DATES } from "./scheduling";
 import type { Db, Queryable } from "./db";
 
 type Row = Record<string, unknown>;
@@ -50,7 +51,7 @@ export async function resetLiveTables(d: Db) {
 
 // The partner's schedule covers 2026-10-16 to 11-05. So booking keeps working after that, each reset moves the whole seed
 // forward by whole weeks (weekdays stay put) once Central "today" is a week or more past 2026-10-19. Slot times are rebuilt
-// from Central wall-clock, so DST is still applied by tzdata. Before then, and whenever DEMO_NOW pins the clock, it is 0.
+// from Central wall-clock, so DST is still applied by tzdata. It is 0 before 2026-10-26, including the eval's pinned date.
 const SEED_ANCHOR = Date.UTC(2026, 9, 19);
 export function seedOffsetDays(at: Date = now()): number {
   const [y, m, d] = at.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }).split("-").map(Number);
@@ -75,6 +76,11 @@ export async function resetLiveTablesIn(q: Queryable) {
     SELECT appointment_id, slot_id, customer_id, issue_description, created_at + make_interval(days => $1::int), status, is_warranty_visit
     FROM seed_appointments`, [off]);
   await q.query(`ALTER TABLE appointments ENABLE TRIGGER appointments_no_overlap`);
+  // Rolled forward, some seed slots land on days the company is closed. They are blocked, and the visits on them cancelled,
+  // so no caller is told their visit is on Christmas Day.
+  await q.query(`UPDATE appointment_slots SET status = 'blocked' WHERE slot_date = ANY($1::date[])`, [CLOSED_DATES]);
+  await q.query(`UPDATE appointments SET status = 'cancelled' WHERE status = 'scheduled'
+    AND slot_id IN (SELECT slot_id FROM appointment_slots WHERE slot_date = ANY($1::date[]))`, [CLOSED_DATES]);
   await q.query(`SELECT setval(pg_get_serial_sequence('appointments','appointment_id'), (SELECT coalesce(max(appointment_id),1) FROM appointments))`);
   await q.query(`INSERT INTO invoices (invoice_id, customer_id, appointment_id, issued_date, due_date, amount_cents, balance_cents, line_items)
     SELECT invoice_id, customer_id, appointment_id, issued_date + $1::int, due_date + $1::int, amount_cents, balance_cents, line_items

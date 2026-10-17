@@ -12,7 +12,7 @@ import { confirmBooking } from "../lib/scheduling";
 import { loadSeedFromSqlite } from "../lib/seed";
 import { pgliteDb } from "../test/pglite";
 
-process.env.DEMO_NOW ??= "2026-10-16T15:00:00Z";
+process.env.DEMO_NOW ||= "2026-10-16T15:00:00Z";
 const need = (k: string): string => process.env[k] || (() => { throw new Error(`set ${k} (see .env.example)`); })();
 const data = need("MERIDIAN_DATA_DIR");
 const d = await pgliteDb();

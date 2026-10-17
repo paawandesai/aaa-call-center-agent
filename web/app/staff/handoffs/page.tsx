@@ -26,6 +26,8 @@ export default async function Handoffs({ searchParams }: { searchParams: Promise
   const waiting = await openHandoffCount(q);
   const want = Number((await searchParams).id);
   const sel = rows.find((h) => h.id === want) ?? rows[0];
+  // Model summaries are stored with an "AI-written: " prefix; rule-based handoffs carry fixed text without it.
+  const aiWritten = !!sel?.summary.startsWith("AI-written: ");
   const [summary, excerpt] = sel ? sel.summary.replace(/^AI-written: /, "").split("\nCaller's last message (redacted): ") : ["", ""];
   const caller = sel ? Object.fromEntries(Object.entries(sel.caller_provided).filter(([k]) => k !== "verified")) : {};
   return (
@@ -78,7 +80,7 @@ export default async function Handoffs({ searchParams }: { searchParams: Promise
               ) : null}
 
               <section className="stack-8">
-                <span className="label">Summary · AI-written, check with the caller</span>
+                <span className="label">{aiWritten ? "Summary · AI-written, check with the caller" : "Summary · fixed text from a safety or routing rule"}</span>
                 <p style={{ margin: 0, maxWidth: 680 }}>{summary}</p>
               </section>
 

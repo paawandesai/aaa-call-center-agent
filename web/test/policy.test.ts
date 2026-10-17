@@ -152,3 +152,14 @@ describe("zip lookup", () => {
     ["78666", "not_serviced"], ["90210", "not_serviced"], ["abc", "unknown"],
   ])("%s -> %s", (zip, kind) => expect(zipLookup(zip).kind).toBe(kind));
 });
+
+describe("sparked (fourth-pass review)", () => {
+  it.each(["my outlet sparked when I plugged in the heater", "the breaker panel sparked and now half the house is dark", "it sparked behind the wall switch"])(
+    "electrical: %s", (text) => expect(route(text)).toMatchObject({ kind: "safety", script: "electrical" }));
+  it("a bare 'sparked' is an ambiguous word for the classifier", () => expect(route("the fan motor sparked once")).toMatchObject({ kind: "safety", tier: "weak" }));
+});
+
+describe("igniter sparks (fourth-pass review)", () => {
+  it.each(["the furnace igniter sparked a few times but the burner never lit", "the water heater pilot sparks but takes a while to catch"])(
+    "normal ignition is not a rule hit: %s", (text) => expect(route(text).kind).not.toBe("safety"));
+});

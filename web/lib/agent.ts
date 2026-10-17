@@ -5,7 +5,7 @@ import { config, now } from "./config";
 import type { Conversation } from "./conversations";
 import type { Db } from "./db";
 import type { Emit } from "./events";
-import { createHandoff } from "./handoffs";
+import { createHandoff, type HandoffResult } from "./handoffs";
 import { HANDOFF_COPY, route, SCRIPTS, type HandoffReason, type SafetyScript } from "./policy";
 import { classifySafety, VERDICT_INTENT, VERDICT_SCRIPT, verdictLocks } from "./safety";
 import { SYSTEM_PROMPT, turnData } from "./prompt";
@@ -162,6 +162,10 @@ const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: config.tz, year
 const slotEvent = (s: Slot) => ({ slot_id: s.slot_id, date: s.date, window_label: whenLabel(s.date, s.window), tz: "America/Chicago" as const });
 
 // slotPick is set only when the server itself wrote the text from a slot button, so typed text never skips the safety check.
+// What the handoff card says about the queue: its position, or that this one wasn't queued (per-IP demo cap).
+const queueFields = (h: HandoffResult | undefined) =>
+  !h ? {} : "suppressed" in h ? { not_queued: true } : { queue_position: h.position };
+
 export async function runTurn(deps: Deps, c: Conversation, callerText: string, emit: Emit, signal?: AbortSignal, slotPick = false): Promise<TurnResult> {
   const started = Date.now();
   const res: TurnResult = { outcome: "answered", inputTokens: 0, outputTokens: 0, usage: emptyUsage(), toolCalls: [] };
@@ -176,7 +180,7 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
       // One handoff per reason per conversation: repeating the request doesn't add another ticket to the queue.
       const h = c.handoff === reason ? undefined : await createHandoff(deps.db, c, reason, `Sent by a fixed rule, not written by AI: ${intent.replace(/_/g, " ")}.`, text, "policy");
       c.handoff = reason;
-      emit({ type: "handoff", reason_enum: reason, summary_for_caller: INTENT_SUMMARY[intent] ?? HANDOFF_COPY[reason], queue_position: h?.position });
+      emit({ type: "handoff", reason_enum: reason, summary_for_caller: INTENT_SUMMARY[intent] ?? HANDOFF_COPY[reason], ...queueFields(h) });
     }
   };
 
@@ -189,7 +193,9 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
   if (!(r.kind === "safety" && r.tier !== "weak") && !c.selfHarm && !slotPick && !isData(text)) {
     // The knowledge-base search starts alongside the check so the check adds little wait to an ordinary question.
     if (r.kind === "model" && !isLogistics(text)) { searchEarly = deps.search(text); searchEarly.catch(() => {}); }
-    const { verdict, usage } = await classifySafety(deps.anthropic, text, lastAssistantText(c), signal);
+    const { verdict, usage } = await classifySafety(deps.anthropic, text, lastAssistantText(c), signal).catch((e) => {
+      throw Object.assign(e, { usage: res.usage, safetyUsage: (e as { usage?: Usage }).usage });
+    });
     res.safetyUsage = usage;
     res.safetyCheck = !verdict ? "failed" : verdictLocks(verdict) ? verdict.category : "clear";
     if (verdict && verdictLocks(verdict)) {
@@ -241,6 +247,7 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     ...c.notes.splice(0)].filter(Boolean);
   const extra = notes.length ? notes.join(" ") : undefined;
   const base = c.messages.length;
+  let streaming: Usage | undefined; // the current round's usage while its stream is open
   c.messages.push({ role: "user", content: turnData(today(), passages, text, extra) });
 
   let sawUiCard = false;
@@ -262,6 +269,15 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
         { signal },
       );
       let roundChars = 0, roundText = "", noteChecked = false;
+      // Usage as the stream reports it, so a turn the caller abandons mid-stream still counts what this round cost.
+      streaming = emptyUsage();
+      stream.on("streamEvent", (ev) => {
+        if (!streaming) return;
+        if (ev.type === "message_start") {
+          const u = ev.message.usage;
+          streaming = { input: u.input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0, output: u.output_tokens ?? 0 };
+        } else if (ev.type === "message_delta") streaming = { ...streaming, output: ev.usage.output_tokens ?? streaming.output };
+      });
       const hadFirstToken = res.firstTokenMs !== undefined;
       stream.on("text", (delta) => {
         res.firstTokenMs ??= Date.now() - started;
@@ -276,6 +292,7 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
         }
       });
       const msg = await stream.finalMessage();
+      streaming = undefined; // counted from the final message below
       // Text written alongside a tool call is the model thinking aloud, not a reply; take it back off the screen.
       if (roundChars && msg.content.some((b) => b.type === "tool_use")) {
         emit({ type: "text_discard", chars: roundChars });
@@ -315,7 +332,9 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     // Roll back this turn's unanswered tail so a retry starts clean; earlier turns are untouched.
     c.messages.length = base;
     // An aborted turn still cost tokens: the route reads them from the error and counts them toward the spend cap.
-    if (e instanceof Anthropic.APIUserAbortError) throw Object.assign(e, { usage: res.usage, safetyUsage: res.safetyUsage });
+    if (e instanceof Anthropic.APIUserAbortError) {
+      throw Object.assign(e, { usage: streaming ? addUsage(res.usage, streaming) : res.usage, safetyUsage: res.safetyUsage });
+    }
     const retryable = e instanceof Anthropic.RateLimitError || e instanceof Anthropic.InternalServerError || e instanceof Anthropic.APIConnectionError;
     emit({ type: "error", code: e instanceof Anthropic.APIError ? `model_${e.status ?? "conn"}` : "server_error", retryable });
     return { ...res, outcome: "error" };
@@ -416,7 +435,7 @@ async function modelHandoff(deps: Deps, c: Conversation, asked: (typeof MODEL_HA
   res.outcome = reason === "safety" ? "safety" : "handoff";
   res.handoffReason = reason;
   const forCaller = script ? (INTENT_SUMMARY[script] ?? INTENT_SUMMARY.urgent) : summary.slice(0, 400);
-  emit({ type: "handoff", reason_enum: reason, summary_for_caller: forCaller, summary_source: script ? "fixed" : "model", queue_position: h?.position });
+  emit({ type: "handoff", reason_enum: reason, summary_for_caller: forCaller, summary_source: script ? "fixed" : "model", ...queueFields(h) });
 }
 
 async function runTool(
@@ -467,7 +486,7 @@ async function runTool(
       }
       c.caller.name = p.data.caller_name.trim();
       c.pending = { session_id: c.sessionId, slot_id: o.slot_id, zone: o.zone, zip: o.zip, city: o.city, service_type: o.service_type,
-        name: c.caller.name, issue: p.data.issue_summary };
+        name: c.caller.name, issue: p.data.issue_summary, date: o.date };
       emit({ type: "status", phase: "booking" });
       emit({ type: "confirm_request", service: SERVICE_LABEL[o.service_type], slot_id: o.slot_id, when_label: whenLabel(o.date, o.window),
         zip: o.zip, name: c.caller.name, fee_label: FEE_LABEL[o.service_type] });
@@ -479,7 +498,8 @@ async function runTool(
       if (!p.success) return bad("INVALID_INPUT");
       if (c.verified) return { content: JSON.stringify({ result: "already_verified", first_name: c.verified.firstName }) };
       // Three tries per conversation and ten per session per hour, so the tool can't be used to search for accounts.
-      if (c.verifyAttempts >= 3 || !allow(`verify:${c.sessionId}`, 10, 3_600_000).ok)
+      // Sessions are free, so attempts are also capped per IP bucket (20 a day).
+      if (c.verifyAttempts >= 3 || !allow(`verify:${c.sessionId}`, 10, 3_600_000).ok || (c.clientIp && !allow(`verifyip:${c.clientIp}`, 20, 86_400_000).ok))
         return { content: JSON.stringify({ result: "locked", note: "Too many attempts. Offer to pass the caller to a person (handoff reason out_of_scope)." }) };
       c.verifyAttempts++;
       const v = await verifyCaller(deps.db, p.data.phone, p.data.zip);

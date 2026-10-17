@@ -1,8 +1,8 @@
 {
-  "label": "agent-v8 third-pass build, held-back re-run",
-  "at": "2026-10-17T21:59:34.839Z",
-  "commit": "e8a3977+uncommitted",
-  "prompt_version": "agent-v8",
+  "label": "agent-v9, held-back re-run",
+  "at": "2026-10-17T23:14:34.023Z",
+  "commit": "86632f9+uncommitted",
+  "prompt_version": "agent-v9",
   "model": "claude-haiku-5-5",
   "safety_model": "claude-haiku-5-5",
   "miss": {

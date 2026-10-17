@@ -1,5 +1,6 @@
 import { db, type Db } from "./db";
 import { sweepConversations } from "./conversations";
+import { config } from "./config";
 import { seedDemoActivity } from "./demoseed";
 import { resetLiveTablesIn } from "./seed";
 
@@ -25,6 +26,8 @@ export async function maybeNightlyReset(d: Db = db()): Promise<boolean> {
     const { rows: again } = await q.query<{ due: boolean }>(`SELECT ${DUE} AS due`);
     if (!again[0]?.due) return false;
     await resetLiveTablesIn(q);
+    // Vectors from an earlier embedding model or revision, kept through the deploy that replaced them.
+    await q.query(`DELETE FROM kb_chunks WHERE embed_model <> $1`, [config.embedTag]);
     await q.query(`DELETE FROM handoffs WHERE created_at < now() - interval '7 days'`);
     await q.query(`DELETE FROM feedback WHERE created_at < now() - interval '30 days'`);
     await q.query(`DELETE FROM staff_flags WHERE created_at < now() - interval '30 days'`);

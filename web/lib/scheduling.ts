@@ -20,7 +20,7 @@ export const FEE_LABEL: Record<ServiceType, string> = {
 // Holiday closures from the 2026 holiday hours notice. No regular appointments on these dates.
 // Full closures from the holiday hours image. Its shortened Christmas Eve hours are not modelled. The mock schedule rolls
 // forward weekly (lib/seed.ts), so these dates can come into range.
-const CLOSED_DATES = ["2026-11-26", "2026-11-27", "2026-12-25", "2027-01-01"];
+export const CLOSED_DATES = ["2026-11-26", "2026-11-27", "2026-12-25", "2027-01-01"];
 const LEAD_MINUTES = 120;
 
 export interface Slot {
@@ -112,6 +112,7 @@ export interface PendingBooking {
   service_type: ServiceType;
   name: string;
   issue: string;
+  date?: string; // the slot's date when the card was shown; the weekly roll-forward can move a slot id to a new date
 }
 
 export type BookingResult =
@@ -143,9 +144,9 @@ export async function confirmBooking(
   const all = await tx.query<{ n: number }>(`SELECT count(*)::int AS n FROM appointments WHERE booked_by_session IS NOT NULL`);
   if (all.rows[0].n >= config.demoBookingsPerDay) return { ok: false, reason: "cap_reached" };
 
-  const slotRow = await tx.query<{ tech_id: number }>(
-    `SELECT tech_id FROM appointment_slots WHERE slot_id = $1 FOR UPDATE`, [p.slot_id]);
-  if (!slotRow.rows[0]) return { ok: false, reason: "slot_taken" };
+  const slotRow = await tx.query<{ tech_id: number; date: string }>(
+    `SELECT tech_id, to_char(slot_date,'YYYY-MM-DD') AS date FROM appointment_slots WHERE slot_id = $1 FOR UPDATE`, [p.slot_id]);
+  if (!slotRow.rows[0] || (p.date && slotRow.rows[0].date !== p.date)) return { ok: false, reason: "slot_taken" };
   // Serialize all bookings for this technician, then re-check availability by time range.
   await tx.query(`SELECT 1 FROM technicians WHERE tech_id = $1 FOR UPDATE`, [slotRow.rows[0].tech_id]);
   const slot = await isSlotAvailable(tx, p.slot_id, p.zone, p.service_type);

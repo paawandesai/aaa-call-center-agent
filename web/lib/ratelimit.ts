@@ -41,18 +41,22 @@ export async function overSpendCap(q: Queryable): Promise<boolean> {
   return s.usd >= s.cap;
 }
 
-// The client address as Railway's edge proxy saw it: the last X-Forwarded-For entry is the one the proxy appended,
-// so a client can't choose it by sending its own header.
 // One rate-limit bucket per IPv4 address, or per IPv6 /64 (one home or host usually gets a whole /64).
-export function ipBucket(ip: string): string {
-  if (!ip.includes(":")) return ip;
+export function ipBucket(raw: string): string {
+  const ip = raw.split("%")[0].toLowerCase(); // drop an IPv6 zone id
+  const mapped = /^(?:0*:)*:?ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip); // IPv4-mapped IPv6 is the IPv4 address
+  if (mapped) return mapped[1];
+  if (!ip.includes(":") || ip === "::1") return ip;
   const [head, tail = ""] = ip.split("::");
   const h = head ? head.split(":") : [];
   const groups = [...h, ...Array(Math.max(0, 8 - h.length - (tail ? tail.split(":").length : 0))).fill("0"), ...(tail ? tail.split(":") : [])];
   return `${groups.slice(0, 4).map((g) => g.toLowerCase().replace(/^0+(?=.)/, "")).join(":")}::/64`;
 }
 
+// The client address as Railway's edge proxy saw it: the last X-Forwarded-For entry is the one the proxy appended,
+// so a client can't choose it by sending its own header. Returned as its rate-limit bucket (IPv4, or IPv6 /64), which is
+// all it is used for.
 export function clientIp(req: Request): string {
   const parts = (req.headers.get("x-forwarded-for") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
-  return parts.at(-1) ?? "unknown";
+  return ipBucket(parts.at(-1) ?? "unknown");
 }

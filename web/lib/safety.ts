@@ -35,7 +35,7 @@ category: the kind of real, present danger the message reports or suggests, or "
 - caller_in_danger: someone is threatening, attacking or breaking in on the caller, or the caller is witnessing someone being attacked or crying for help right now.
 - domestic_violence: a partner or family member is hurting or threatening the caller.
 - other_emergency: any other danger to a person's life or health happening now.
-Ordinary equipment problems (no heat, no cooling, a leak, a noise, a part question, a price question about detectors) are "none". So are past events that are over and questions about safety devices. A hot or cold home is "none" unless the message says a person has symptoms now (fainting, confusion, trouble breathing, signs of heat or cold illness) or that an infant or frail older person is suffering from it. A condition or circumstance on its own (asthma, a wheelchair, pregnancy, a child home alone) is not a symptom and is "none".
+Ordinary equipment problems (no heat, no cooling, a leak, a noise, a part question, a price question about detectors) are "none". A furnace or water heater igniter or pilot that sparks or clicks while trying to light is normal ignition and "none", unless the message also mentions smoke, a burning or gas smell, or sparks from wiring, an outlet or a panel. So are past events that are over and questions about safety devices. A hot or cold home is "none" unless the message says a person has symptoms now (fainting, confusion, trouble breathing, signs of heat or cold illness) or that an infant or frail older person is suffering from it. A condition or circumstance on its own (asthma, a wheelchair, pregnancy, a child home alone) is not a symptom and is "none".
 
 figurative_or_name: true when every danger-sounding word in the message is an idiom, a joke, a name, or about equipment rather than a person ("my wife will kill me", "this heat is killing me", "the compressor is dying", "Kat Smoke"). When in doubt about whether a person may be in danger, choose the danger category and false.`;
 
@@ -55,7 +55,11 @@ export async function classifySafety(anthropic: Anthropic, text: string, lastAss
       if (r.parsed_output) return { verdict: r.parsed_output, usage };
       console.warn(`safety check attempt ${attempt + 1} returned no verdict (stop ${r.stop_reason})`);
     } catch (e) {
-      if (e instanceof Anthropic.APIUserAbortError) throw e;
+      // The caller left mid-check. The request may already be billed, so an estimate of its input (about 4 characters a
+      // token) goes with the error to the spend cap; output is unknown and not counted.
+      if (e instanceof Anthropic.APIUserAbortError) {
+        throw Object.assign(e, { usage: { ...usage, input: usage.input + Math.ceil((SYSTEM.length + content.length) / 4) } });
+      }
       console.warn(`safety check attempt ${attempt + 1} failed: ${e instanceof Anthropic.APIError ? `status ${e.status ?? "conn"}` : (e as Error).name}`);
     }
   }

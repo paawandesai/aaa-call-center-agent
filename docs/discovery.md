@@ -2,7 +2,7 @@
 
 _Scope update 2026-10-17: see [Scope change](#scope-change-2026-10-17) at the end; the handle/escalate table and ceiling below are the original 2026-10-16 analysis._
 
-_Run 2026-10-16 on the discovery split only: the 320 July–August calls. The 100 September calls are held out (`eval/holdout_manifest.txt`) and were not read. All counts come from redacted transcripts. Caller requests below are paraphrased, not quoted._
+_Run 2026-10-16 on the discovery split only: the 320 July–August calls. The 100 September calls are held out (`eval/holdout_manifest.txt`) and were not used for discovery; before the split, only a keyword count and 25 sampled first lines over all 420 calls were looked at. All counts come from redacted transcripts. Caller requests below are paraphrased, not quoted._
 
 ## Method
 

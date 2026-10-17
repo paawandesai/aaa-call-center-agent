@@ -11,7 +11,7 @@ export const config = {
   // Pinned to one Hugging Face commit, so a rebuild can't fetch changed weights that no longer match the stored KB vectors.
   // The tag stored with each vector includes it, so changing the revision re-embeds the KB on the next deploy.
   embedRevision: "ea104dacec62c0de699686887e3f920caeb4f3e3",
-  embedTag: "Xenova/bge-small-en-v1.5@ea104da",
+  get embedTag() { return `${this.embedModel}@${this.embedRevision.slice(0, 7)}`; },
   embedQueryPrefix: "Represent this sentence for searching relevant passages: ",
   retrievalK: Number(process.env.RETRIEVAL_K ?? 5),
   minRetrievalScore: Number(process.env.MIN_RETRIEVAL_SCORE ?? 0.55),
@@ -20,7 +20,7 @@ export const config = {
   bookingAttemptsPerIpDay: Number(process.env.BOOKING_ATTEMPTS_PER_IP_DAY ?? 10),
   maxSlotsShown: 4,
   tz: "America/Chicago",
-  promptVersion: "agent-v8",
+  promptVersion: "agent-v9",
 };
 
 // DEMO_NOW pins the clock exactly (tests and the eval, so runs are repeatable). CLOCK_FLOOR is for the live demo: the

@@ -5,13 +5,15 @@ import { embed, toVector } from "./embed";
 
 interface Chunk { id: string; doc: string; kind: string; effective: string | null; text: string }
 
-// Loads curated chunks (output of kb/ingest.py) and stores the embedding model id with every vector.
+// Loads curated chunks (output of kb/ingest.py) and stores the embedding model tag with every vector. Only rows with the
+// current tag are replaced: during a deploy the old server still searches its own tag, so its rows stay until the nightly
+// reset prunes them (lib/reset.ts).
 export async function loadKb(d: Db, chunksPath: string) {
   const chunks = JSON.parse(readFileSync(chunksPath, "utf8")) as Chunk[];
   const vecs: number[][] = [];
   for (let i = 0; i < chunks.length; i += 16) vecs.push(...(await embed(chunks.slice(i, i + 16).map((c) => c.text))));
   await d.tx(async (q) => {
-    await q.query(`DELETE FROM kb_chunks`);
+    await q.query(`DELETE FROM kb_chunks WHERE embed_model = $1`, [config.embedTag]);
     for (const [i, c] of chunks.entries()) {
       // Chunk text starts with "Title > Section" (prose) or "Title | row" (table rows).
       const head = c.text.split("\n")[0].split(" | ")[0];

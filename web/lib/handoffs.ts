@@ -5,18 +5,25 @@ import { allow } from "./ratelimit";
 import { redact } from "./redact";
 
 // A safety phrase creates a handoff without a model call, so it costs nothing and the spend cap never applies. To keep one
-// visitor from burying real emergencies in the queue, a session gets one open ticket per reason a day, and an IP five tickets
-// a day. Over the limit no row is written, but the caller still sees the script and the handoff card.
+// visitor from burying real emergencies in the queue, a second handoff for the same reason from the same session within a
+// day is added to the open ticket (staff see both summaries) instead of making a new row. Non-safety tickets are also
+// capped at five per IP bucket a day; over that the caller is told it wasn't queued. Safety tickets are never dropped.
 const PER_IP_DAY = 5;
+const MAX_SUMMARY = 4000;
+
+export type HandoffResult = { id: number; position: number } | { suppressed: true };
 
 export async function createHandoff(q: Queryable, c: Conversation, reason: HandoffReason, summary: string, lastCallerText: string,
-  source: "model" | "policy" = "model") {
+  source: "model" | "policy" = "model"): Promise<HandoffResult> {
+  const text = `${source === "model" ? "AI-written: " : ""}${redact(summary)}\nCaller's last message (redacted): ${redact(lastCallerText).slice(0, 300)}`;
   const { rows: open } = await q.query<{ id: number; position: number }>(
-    `SELECT h.id, (SELECT count(*)::int FROM handoffs o WHERE o.status = 'open' AND o.created_at <= h.created_at) AS position
-     FROM handoffs h WHERE h.session_id = $1 AND h.reason = $2 AND h.status = 'open' AND h.created_at > now() - interval '1 day'
-     ORDER BY h.created_at DESC LIMIT 1`, [c.sessionId, reason]);
+    `UPDATE handoffs h SET summary = left(h.summary || E'\n---\nLater, in the same session:\n' || $3, $4)
+     WHERE h.id = (SELECT id FROM handoffs WHERE session_id = $1 AND reason = $2 AND status = 'open' AND created_at > now() - interval '1 day'
+                   ORDER BY created_at DESC LIMIT 1)
+     RETURNING h.id::int AS id, (SELECT count(*)::int FROM handoffs o WHERE o.status = 'open' AND o.created_at <= h.created_at) AS position`,
+    [c.sessionId, reason, text, MAX_SUMMARY]);
   if (open[0]) return open[0];
-  if (c.clientIp && !allow(`handoffip:${c.clientIp}`, PER_IP_DAY, 86_400_000).ok) return undefined;
+  if (reason !== "safety" && c.clientIp && !allow(`handoffip:${c.clientIp}`, PER_IP_DAY, 86_400_000).ok) return { suppressed: true };
   const slot = c.pending ? { slot_id: c.pending.slot_id, service_type: c.pending.service_type }
     : c.bookedRefs?.length ? { booked_refs: c.bookedRefs } : null;
   const callerProvided: Record<string, string> = {};
@@ -28,8 +35,7 @@ export async function createHandoff(q: Queryable, c: Conversation, reason: Hando
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id)
      SELECT ins.id, (SELECT count(*)::int FROM handoffs WHERE status = 'open') + 1 AS position FROM ins`,
     [c.sessionId, reason, c.intents.at(-1) ?? null, JSON.stringify(c.steps.slice(-8)),
-     JSON.stringify({ ...callerProvided, verified: !!c.verified }), slot ? JSON.stringify(slot) : null,
-     `${source === "model" ? "AI-written: " : ""}${redact(summary)}\nCaller's last message (redacted): ${redact(lastCallerText).slice(0, 300)}`],
+     JSON.stringify({ ...callerProvided, verified: !!c.verified }), slot ? JSON.stringify(slot) : null, text],
   );
   return rows[0];
 }

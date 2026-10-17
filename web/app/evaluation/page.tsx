@@ -61,7 +61,7 @@ export default async function Evaluation() {
         <div className="stack-8" style={{ maxWidth: 760 }}>
           <span className="label">Eval run {r.run_id} · {r.created_at.slice(0, 10)} · config {r.config_id} · prompt {r.prompt_version}</span>
           <h1 className="h1">How well the assistant does on held-out calls</h1>
-          <p className="muted" style={{ margin: 0 }}>The test set is {r.split}, held out before call-driver discovery; each caller's opening line is verbatim from the redacted transcript, and a simulated caller answers the follow-up questions. Each item is scored by code against facts from the current knowledge base. No AI grades the AI. These numbers are for prompt {r.prompt_version}. The deployed prompt is {config.promptVersion}, which has been measured on the dev set and the adversarial set only (see the README).</p>
+          <p className="muted" style={{ margin: 0 }}>The test set is {r.split}, held out before call-driver discovery; each caller's opening line is verbatim from the redacted transcript, and a simulated caller answers the follow-up questions. Each item is scored by code: question calls against facts from the current knowledge base, account calls against the assigned customer's records, bookings and changes against the database. No AI grades the AI. These numbers are for prompt {r.prompt_version}. The deployed prompt is {config.promptVersion}, which has been measured on the dev set and the adversarial set only (see the README).</p>
           {r.note && <p style={{ margin: 0 }}>{r.note}</p>}
         </div>
 
@@ -91,7 +91,7 @@ export default async function Evaluation() {
         <div className="tiles" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
           <section className="tile"><span className="label">Accuracy on handled drivers</span><span className="value">{pct(r.accuracy.rate)}</span><span className="small muted">Right outcome, required facts present, no stale values · {ci(r.accuracy)}</span></section>
           <section className="tile"><span className="label">Escalation precision / recall</span><span className="value">{pct(r.escalation.precision.rate)} / {pct(r.escalation.recall.rate)}</span><span className="small muted">Handed off when it should ({r.escalation.recall.k} of {r.escalation.recall.n}), and only then ({r.escalation.precision.k} of {r.escalation.precision.n})</span></section>
-          {r.retrieval && <section className="tile"><span className="label">Retrieval · recall@5</span><span className="value">{pct(r.retrieval.hit5.rate)}</span><span className="small muted">Dev set, n={r.retrieval.hit5.n}, not the held-out calls · measured on its own, before answers · MRR {r.retrieval.mrr.toFixed(2)} · {ci(r.retrieval.hit5)}</span></section>}
+          {r.retrieval && <section className="tile"><span className="label">Retrieval · hit@5</span><span className="value">{pct(r.retrieval.hit5.rate)}</span><span className="small muted">Dev set, n={r.retrieval.hit5.n}, not the held-out calls · measured on its own, before answers · MRR {r.retrieval.mrr.toFixed(2)} · {ci(r.retrieval.hit5)}</span></section>}
           <section className="tile"><span className="label">Adversarial set</span><span className="value">{r.adversarial.k} of {r.adversarial.n} held</span><span className="small muted">Prompt {r.prompt_version}, before the set grew; the README has the deployed prompt&apos;s run · injection, bulk booking, other callers&apos; data, repeated asks for a person{r.probes ? ` · KB probes ${r.probes.k} of ${r.probes.n}` : ""}</span></section>
           <section className="tile"><span className="label">Safety calls</span><span className="value">{r.safety.k} of {r.safety.n}</span><span className="small muted">Safety script shown and handed off, never booked</span></section>
         </div>
@@ -112,7 +112,7 @@ export default async function Evaluation() {
               );
             })}</tbody>
           </table></div>
-          <span className="small muted">Pass means the expected outcome happened and every check held. Rows with n under 20 are greyed out and labelled &ldquo;too few to judge&rdquo;.</span>
+          <span className="small muted">Pass means the expected outcome happened and every check held. Rows with n under 20 are greyed out and labelled &ldquo;too few to judge&rdquo;. A booking call whose ZIP zone had no openings for its service passes as a correct handoff, so the booking row includes a few of those.</span>
         </section>
 
         {r.failures.length > 0 && (
