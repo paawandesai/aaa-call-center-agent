@@ -180,7 +180,7 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
 
   // 1. Safety runs first and is one-way. Unambiguous phrases lock at once. Every other message also goes to the safety
   // classifier, which confirms or rejects an ambiguous rule hit ("kill me", "smoke") and catches wording no rule has.
-  // It can add a lock, never remove one. If it can't run, an ambiguous hit locks, and any other message goes unanswered
+  // It never removes a strong-rule lock. If it can't run, an ambiguous hit locks, and any other message goes unanswered
   // with a retry, so no message reaches the model unscreened.
   let r = route(text);
   let searchEarly: Promise<Passage[]> | undefined;
@@ -194,7 +194,9 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
       const script = VERDICT_SCRIPT[verdict.category as keyof typeof VERDICT_SCRIPT];
       if (!(r.kind === "safety" && r.script === script)) r = { kind: "safety", script, intent: VERDICT_INTENT[verdict.category as keyof typeof VERDICT_INTENT] };
     } else if (verdict) {
-      if (r.kind === "safety") r = route(text, false);
+      // A cleared ambiguous hit goes to the model, unless the message also talks to the checker (tags, "classify",
+      // "note to the AI"): then the ambiguous hit stays locked, so an injection can't talk its way out of a self-harm card.
+      if (r.kind === "safety" && !STEERING.test(text)) r = route(text, false);
     } else if (r.kind !== "safety") {
       emit({ type: "error", code: "safety_check_failed", retryable: true });
       return { ...res, outcome: "error" };
@@ -339,6 +341,8 @@ export function isSelfNote(p: string): boolean {
 
 // Short replies to the assistant's own questions: a ZIP, a phone number and ZIP, a slot pick from the buttons, or a name.
 const LOGISTICS = [/^\s*(my zip( code)? is\s*)?\d{5}\.?\s*$/i, /^[\s\d().,+-]*\d{3}[\s().-]*\d{3}[\s.-]*\d{4}\b[\s,.]*(and\s+)?(zip( code)?:?\s*)?(\d{5})?\.?\s*$|^(my )?(phone( number)?|number) is [\d\s().-]{10,16}(,? and (my )?zip( code)? is \d{5})?\.?$/i, /^I'll take .+ \(slot_id \d+\)\.$/, /^\s*(it'?s|my name is|i'?m|name'?s)?\s*[A-Z][a-z'-]+( [A-Z][a-z'-]+){0,2}\.?\s*$/];
+const STEERING = /[<>]|\b(classif\w*|categor\w*|instructions?|system|assistant|safety (check|filter)|note to (the )?(ai|bot|model)|not (a )?(real|actual) (danger|emergency|threat)|just quoting|quoting a (movie|song|book)|ignore)\b/i;
+
 // A bare ZIP, phone number or slot button carries no words the safety classifier could read.
 const isData = (text: string) => text.length <= 80 && LOGISTICS.slice(0, 3).some((r) => r.test(text));
 
