@@ -6,7 +6,7 @@ import type { Conversation } from "./conversations";
 import type { Db } from "./db";
 import type { Emit } from "./events";
 import { createHandoff } from "./handoffs";
-import { HANDOFF_COPY, route, SCRIPTS, type HandoffReason } from "./policy";
+import { HANDOFF_COPY, route, SCRIPTS, type HandoffReason, type SafetyScript } from "./policy";
 import { SYSTEM_PROMPT, turnData } from "./prompt";
 import type { Passage } from "./retrieval";
 import { FEE_LABEL, findSlots, isSlotAvailable, SERVICE_LABEL, whenLabel, type ServiceType, type Slot } from "./scheduling";
@@ -16,8 +16,9 @@ import { allow } from "./ratelimit";
 
 type Tool = Anthropic.Beta.BetaTool;
 const SERVICE_TYPES = ["hvac_repair", "hvac_tune_up", "plumbing", "estimate"] as const;
-// "self_harm" is a model-only label: it is stored as reason safety and shows the 988 script, not the gas/CO/fire one.
-const MODEL_HANDOFF_REASONS = ["safety", "self_harm", "billing_account", "cancel_reschedule", "complaint", "human_requested",
+// "self_harm", "medical" and "threat" are model-only labels that pick the script; they are stored as reason safety
+// (threat as adversarial). A plain "safety" handoff shows the script the caller's words match, else a generic urgent one.
+const MODEL_HANDOFF_REASONS = ["safety", "self_harm", "medical", "threat", "billing_account", "cancel_reschedule", "complaint", "human_requested",
   "low_confidence", "service_area_unclear", "booking_failed", "out_of_scope"] as const;
 
 // Narrow tools. None of them writes: propose_booking and propose_appointment_change only show a card the caller confirms.
@@ -93,7 +94,7 @@ export const TOOLS: Tool[] = [
     input_schema: {
       type: "object",
       properties: {
-        reason: { type: "string", enum: [...MODEL_HANDOFF_REASONS], description: "safety for gas, carbon monoxide, sparks, smoke, fire or burning smells; self_harm if the caller talks about hurting themselves or not wanting to live" },
+        reason: { type: "string", enum: [...MODEL_HANDOFF_REASONS], description: "safety for gas, carbon monoxide, sparks, smoke, fire, burning smells or electrical hazards; self_harm if the caller talks about hurting themselves or not wanting to live; medical for anyone who may need emergency care; threat for threats of violence" },
         summary: { type: "string", description: "One or two sentences for staff: what the caller needs and what was already tried" },
       },
       required: ["reason", "summary"],
@@ -136,6 +137,11 @@ const INTENT_SUMMARY: Record<string, string> = {
   sparks_smoke: "You reported sparks or smoke. I showed the safety steps and marked it urgent.",
   burning_smell: "You reported a burning smell. I showed the safety steps and marked it urgent.",
   self_harm: "You told me you're going through something serious. I shared the 988 crisis line and marked it urgent.",
+  medical: "You told me someone may need emergency care. I asked you to call 911 and marked it urgent.",
+  electrical: "You reported an electrical hazard. I showed the safety steps and marked it urgent.",
+  threat: "This chat has been passed to our team.",
+  domestic_violence: "You told me you may not be safe at home. I shared the hotline and asked a person to follow up carefully.",
+  urgent: "You told me about something urgent. I marked it for our team right away.",
   human_requested: "You asked to speak with a person. Your message is in the queue.",
   cancel_reschedule: "You want to change or cancel an existing appointment.",
   billing: "You have a question about a bill, charge or payment.",
@@ -170,11 +176,11 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
   // 1. Deterministic policy runs first. Safety is one-way.
   const r = route(text);
   if (r.kind === "safety") {
-    c.safetyLock = true;
-    if (r.script === "self_harm") c.selfHarm = true;
+    lockForSafety(c, r.script);
+    const reason: HandoffReason = r.script === "threat" ? "adversarial" : "safety";
     emit({ type: "safety", script: r.script, text: SCRIPTS[r.script] });
-    await scripted(SCRIPTS[r.script], "safety", r.intent);
-    return { ...res, outcome: "safety", handoffReason: "safety", intent: r.intent };
+    await scripted(SCRIPTS[r.script], reason, r.intent);
+    return { ...res, outcome: "safety", handoffReason: reason, intent: r.intent };
   }
   if (r.kind === "handoff") {
     emit({ type: "text_delta", text: HANDOFF_COPY[r.reason] });
@@ -333,22 +339,35 @@ export function supports(passage: string, answer: string): boolean {
   return false;
 }
 
+// Once set, the lock is one-way: no booking or change runs, and any card the caller hasn't confirmed is withdrawn.
+function lockForSafety(c: Conversation, script: SafetyScript) {
+  c.safetyLock = true; // the confirm routes refuse while this is set, so an unconfirmed card can't be used
+  if (script === "self_harm") c.selfHarm = true;
+}
+
 async function modelHandoff(deps: Deps, c: Conversation, asked: (typeof MODEL_HANDOFF_REASONS)[number] | HandoffReason, summary: string, text: string, emit: Emit, res: TurnResult) {
-  const reason: HandoffReason = asked === "self_harm" ? "safety" : asked;
-  if (asked === "self_harm") {
-    c.safetyLock = true;
-    c.selfHarm = true;
-    c.intents.push("self_harm");
-    emit({ type: "safety", script: "self_harm", text: SCRIPTS.self_harm });
-  } else if (reason === "safety") {
-    c.safetyLock = true;
-    emit({ type: "safety", script: "gas_co_fire", text: SCRIPTS.gas_co_fire });
+  let script: SafetyScript | undefined;
+  if (asked === "self_harm") script = "self_harm";
+  else if (asked === "medical") script = "medical";
+  else if (asked === "threat") script = "threat";
+  else if (asked === "safety" && !c.safetyLock) {
+    const r = route(text);
+    script = r.kind === "safety" ? r.script : "urgent";
+  }
+  // A repeat safety handoff in an already locked chat adds no second card and no second ticket.
+  const reason: HandoffReason = script === "threat" ? "adversarial" : script || asked === "safety" ? "safety" : (asked as HandoffReason);
+  if (script) {
+    lockForSafety(c, script);
+    const intent = script === "gas_co_fire" ? "safety" : script;
+    c.intents.push(intent);
+    emit({ type: "safety", script, text: SCRIPTS[script] });
   }
   const h = c.handoff === reason ? undefined : await createHandoff(deps.db, c, reason, summary, text);
   c.handoff = reason;
   res.outcome = reason === "safety" ? "safety" : "handoff";
   res.handoffReason = reason;
-  emit({ type: "handoff", reason_enum: reason, summary_for_caller: summary.slice(0, 400), queue_position: h?.position });
+  const forCaller = script ? (INTENT_SUMMARY[script] ?? INTENT_SUMMARY.urgent) : summary.slice(0, 400);
+  emit({ type: "handoff", reason_enum: reason, summary_for_caller: forCaller, queue_position: h?.position });
 }
 
 async function runTool(

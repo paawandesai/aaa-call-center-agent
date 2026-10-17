@@ -69,6 +69,13 @@ export default async function Handoffs({ searchParams }: { searchParams: Promise
                   {Object.keys(caller).length > 0 && <span className="mono small muted">{Object.entries(caller).map(([k, v]) => `${k}: ${String(v)}`).join(" · ")}</span>}</div>
               </div>
 
+              {(sel.slot as { booked_refs?: string[] } | null)?.booked_refs?.length ? (
+                <section role="note" className="card" style={{ borderColor: "var(--danger)" }}>
+                  <strong className="bad">Booked in this chat:</strong> <span className="mono">{(sel.slot as { booked_refs: string[] }).booked_refs.join(", ")}</span>
+                  {sel.reason === "adversarial" && <span> Review before a technician goes out.</span>}
+                </section>
+              ) : null}
+
               <section className="stack-8">
                 <span className="label">Summary · AI-written, check with the caller</span>
                 <p style={{ margin: 0, maxWidth: 680 }}>{summary}</p>

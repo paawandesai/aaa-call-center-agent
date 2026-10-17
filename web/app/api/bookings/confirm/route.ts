@@ -43,6 +43,7 @@ export async function POST(req: Request) {
   if (result.ok) {
     conv.pending = undefined;
     conv.steps.push("booked");
+    (conv.bookedRefs ??= []).push(result.ref);
     conv.notes.push(`The caller pressed Confirm and the app booked the ${result.service.toLowerCase()} for ${result.when_label}, reference ${result.ref}. The app already showed them the booking details.`);
     return Response.json({ type: "booked", ref: result.ref, when_label: result.when_label, tz: result.tz, service: result.service, tech_first_name: result.tech_first_name });
   }

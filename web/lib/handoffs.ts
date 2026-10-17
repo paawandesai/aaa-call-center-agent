@@ -4,7 +4,8 @@ import type { HandoffReason } from "./policy";
 import { redact } from "./redact";
 
 export async function createHandoff(q: Queryable, c: Conversation, reason: HandoffReason, summary: string, lastCallerText: string) {
-  const slot = c.pending ? { slot_id: c.pending.slot_id, service_type: c.pending.service_type } : null;
+  const slot = c.pending ? { slot_id: c.pending.slot_id, service_type: c.pending.service_type }
+    : c.bookedRefs?.length ? { booked_refs: c.bookedRefs } : null;
   const callerProvided: Record<string, string> = {};
   if (c.caller.zip) callerProvided.zip = c.caller.zip;
   if (c.caller.name) callerProvided.name = c.caller.name;

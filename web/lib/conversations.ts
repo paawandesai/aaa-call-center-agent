@@ -20,6 +20,7 @@ export interface Conversation {
   safetyLock: boolean; // one-way: once set, no booking tools run in this conversation
   selfHarm?: boolean; // one-way: once set, every later message gets the fixed 988 follow-up, never the model
   handoff?: HandoffReason;
+  bookedRefs?: string[]; // bookings confirmed in this chat, so a later safety or threat handoff can name them
   intents: string[];
   steps: string[];
   caller: { zip?: string; name?: string };
