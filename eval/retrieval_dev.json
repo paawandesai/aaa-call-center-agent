@@ -63,7 +63,7 @@
   {
    "id": "d06",
    "intent": "membership_info",
-   "q": "How much is the maintenance plan?",
+   "q": "What does the maintenance plan cost per year?",
    "gold": [
     [
      "membership/comfort_club_overview.md",
@@ -93,7 +93,7 @@
   {
    "id": "d08",
    "intent": "membership_info",
-   "q": "I'm a member. Do I get a discount on a new system?",
+   "q": "As a Comfort Club member, is there a discount if I buy a new system?",
    "gold": [
     [
      "membership/comfort_club_overview.md",
@@ -134,7 +134,7 @@
   {
    "id": "d11",
    "intent": "warranty_transfer",
-   "q": "We just bought a house and the previous owner had a system installed by you. Does the warranty transfer?",
+   "q": "We bought a home where you installed the system for the last owner. Does that warranty carry over to us?",
    "gold": [
     [
      "warranty/warranty_policy.md",
@@ -179,7 +179,7 @@
   {
    "id": "d14",
    "intent": "warranty_coverage",
-   "q": "Does the labor warranty cover a repeat repair? You fixed my blower in March and it's doing the same thing.",
+   "q": "You repaired my blower this spring and it's failing the same way again. Is the second repair covered by the labor warranty?",
    "gold": [
     [
      "warranty/warranty_policy.md",
@@ -190,7 +190,7 @@
   {
    "id": "d15",
    "intent": "warranty_claim",
-   "q": "I need to file a warranty claim. The unit you installed last year stopped working.",
+   "q": "The system you put in about a year ago quit. How do I make a warranty claim?",
    "gold": [
     [
      "warranty/warranty_policy.md",

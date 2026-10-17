@@ -345,8 +345,10 @@ for (const it of R.items) {
 out.retrieval = { hit5: rate(hits, R.items.length), mrr: mrr / R.items.length, where: "app query on pgvector (PGlite), dev set" };
 
 const runId = new Date().toISOString().replace(/[-:]/g, "").slice(0, 13) + "-" + randomBytes(2).toString("hex");
-const configId = createHash("sha256").update(JSON.stringify([config.model, config.effort, config.maxTokens, SYSTEM_PROMPT, "thinking:adaptive",
-  config.retrievalK, config.minRetrievalScore])).digest("hex").slice(0, 10);
+// The id also covers the routing rules and the safety classifier, which change behaviour without touching the prompt.
+const codeHash = ["lib/policy.ts", "lib/safety.ts", "lib/agent.ts"].map((f) => readFileSync(path.join(REPO, "web", f), "utf8"));
+const configId = createHash("sha256").update(JSON.stringify([config.model, config.safetyModel, config.effort, config.maxTokens, SYSTEM_PROMPT, "thinking:adaptive",
+  config.retrievalK, config.minRetrievalScore, ...codeHash])).digest("hex").slice(0, 10);
 const cost = costUsd(config.model, usage);
 const nCases = caseLog.length;
 const summary = { run_id: runId, created_at: new Date().toISOString(), config_id: configId, prompt_version: config.promptVersion, split, demo_now: process.env.DEMO_NOW,

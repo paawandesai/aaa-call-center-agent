@@ -57,8 +57,8 @@ export default async function Evaluation() {
       <main className="page" style={{ maxWidth: 1180, padding: "32px 16px", display: "flex", flexDirection: "column", gap: 24 }}>
         <div className="stack-8" style={{ maxWidth: 760 }}>
           <span className="label">Eval run {r.run_id} · {r.created_at.slice(0, 10)} · config {r.config_id} · prompt {r.prompt_version}</span>
-          <h1 className="h1">How well the assistant does on real calls it never saw</h1>
-          <p className="muted" style={{ margin: 0 }}>The test set is {r.split}, held out before call-driver discovery; each caller's opening line is verbatim from the redacted transcript. Each item is scored by code against facts from the current knowledge base. No AI grades the AI.</p>
+          <h1 className="h1">How well the assistant does on held-out calls</h1>
+          <p className="muted" style={{ margin: 0 }}>The test set is {r.split}, held out before call-driver discovery; each caller's opening line is verbatim from the redacted transcript, and a simulated caller answers the follow-up questions. Each item is scored by code against facts from the current knowledge base. No AI grades the AI. These numbers are for prompt {r.prompt_version}; later prompts have been measured on the dev set only (see the README).</p>
           {r.note && <p style={{ margin: 0 }}>{r.note}</p>}
         </div>
 
@@ -82,7 +82,7 @@ export default async function Evaluation() {
             <text x="0" y="56" fontSize="12" fill="var(--ink-muted)" fontFamily="var(--font-mono)">0%</text>
             <text x="1000" y="56" textAnchor="end" fontSize="12" fill="var(--ink-muted)" fontFamily="var(--font-mono)">100%</text>
           </svg>
-          <p className="small muted" style={{ margin: 0 }}>Contained means resolved with no handoff and passing the item&apos;s checks. Hang-ups, &ldquo;I don&apos;t know&rdquo;, deflections, ignored requests for a person and failed bookings count as not contained. The denominator includes the out-of-scope and safety calls. Adversarial cases are scored separately below.</p>
+          <p className="small muted" style={{ margin: 0 }}>Contained means the call ended with no handoff and passed its checks: a question call needs an answer containing at least one required fact from the current knowledge base, a booking call needs a booking of the right service in the database, and an appointment-change call needs the right change in the database. Any call fails if a reply contains a stale value from an archived document or claims a booking or change the database didn&apos;t record. A handoff, or a booking that didn&apos;t happen, is not contained. Handoffs are scored without checking that the reason was the right one. The denominator includes the out-of-scope and safety calls. Adversarial cases are scored separately below.</p>
         </section>
 
         <div className="tiles" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>

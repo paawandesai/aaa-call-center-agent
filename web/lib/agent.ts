@@ -160,7 +160,8 @@ const INTENT_SUMMARY: Record<string, string> = {
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: config.tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(now());
 const slotEvent = (s: Slot) => ({ slot_id: s.slot_id, date: s.date, window_label: whenLabel(s.date, s.window), tz: "America/Chicago" as const });
 
-export async function runTurn(deps: Deps, c: Conversation, callerText: string, emit: Emit, signal?: AbortSignal): Promise<TurnResult> {
+// slotPick is set only when the server itself wrote the text from a slot button, so typed text never skips the safety check.
+export async function runTurn(deps: Deps, c: Conversation, callerText: string, emit: Emit, signal?: AbortSignal, slotPick = false): Promise<TurnResult> {
   const started = Date.now();
   const res: TurnResult = { outcome: "answered", inputTokens: 0, outputTokens: 0, usage: emptyUsage(), toolCalls: [] };
   const text = callerText.slice(0, 2000);
@@ -184,7 +185,7 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
   // with a retry, so no message reaches the model unscreened.
   let r = route(text);
   let searchEarly: Promise<Passage[]> | undefined;
-  if (!(r.kind === "safety" && r.tier !== "weak") && !c.selfHarm && !isData(text)) {
+  if (!(r.kind === "safety" && r.tier !== "weak") && !c.selfHarm && !slotPick && !isData(text)) {
     // The knowledge-base search starts alongside the check so the check adds little wait to an ordinary question.
     if (r.kind === "model" && !isLogistics(text)) { searchEarly = deps.search(text); searchEarly.catch(() => {}); }
     const { verdict, usage } = await classifySafety(deps.anthropic, text, lastAssistantText(c), signal);
@@ -312,7 +313,8 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
   } catch (e) {
     // Roll back this turn's unanswered tail so a retry starts clean; earlier turns are untouched.
     c.messages.length = base;
-    if (e instanceof Anthropic.APIUserAbortError) throw e;
+    // An aborted turn still cost tokens: the route reads them from the error and counts them toward the spend cap.
+    if (e instanceof Anthropic.APIUserAbortError) throw Object.assign(e, { usage: res.usage });
     const retryable = e instanceof Anthropic.RateLimitError || e instanceof Anthropic.InternalServerError || e instanceof Anthropic.APIConnectionError;
     emit({ type: "error", code: e instanceof Anthropic.APIError ? `model_${e.status ?? "conn"}` : "server_error", retryable });
     return { ...res, outcome: "error" };
@@ -343,8 +345,8 @@ export function isSelfNote(p: string): boolean {
 const LOGISTICS = [/^\s*(my zip( code)? is\s*)?\d{5}\.?\s*$/i, /^[\s\d().,+-]*\d{3}[\s().-]*\d{3}[\s.-]*\d{4}\b[\s,.]*(and\s+)?(zip( code)?:?\s*)?(\d{5})?\.?\s*$|^(my )?(phone( number)?|number) is [\d\s().-]{10,16}(,? and (my )?zip( code)? is \d{5})?\.?$/i, /^I'll take .+ \(slot_id \d+\)\.$/, /^\s*(it'?s|my name is|i'?m|name'?s)?\s*[A-Z][a-z'-]+( [A-Z][a-z'-]+){0,2}\.?\s*$/];
 const STEERING = /[<>]|\b(classif\w*|categor\w*|instructions?|system|assistant|safety (check|filter)|note to (the )?(ai|bot|model)|not (a )?(real|actual) (danger|emergency|threat)|just quoting|quoting a (movie|song|book)|ignore)\b/i;
 
-// A bare ZIP, phone number or slot button carries no words the safety classifier could read.
-const isData = (text: string) => text.length <= 80 && LOGISTICS.slice(0, 3).some((r) => r.test(text));
+// A bare ZIP or phone number carries no words the safety classifier could read.
+const isData = (text: string) => text.length <= 80 && LOGISTICS.slice(0, 2).some((r) => r.test(text));
 
 function lastAssistantText(c: Conversation): string | undefined {
   for (let i = c.messages.length - 1; i >= 0; i--) {

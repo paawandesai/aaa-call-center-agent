@@ -45,7 +45,12 @@ FORBIDDEN = [r"\$79\b", r"\$12\.99", r"\$219", r"90[- ]day (labor |repair )?warr
              r"1[- ]year (labor )?(install|installation)",
              # Old FAQ phone hours and payment rule (faq_old_copy.md), added after the 2026-10-17 audit.
              r"8(:00)? ?(am|a\.m\.)\s*(-|–|to)\s*6(:00)? ?(pm|p\.m\.)", r"9(:00)? ?(am|a\.m\.)\s*(-|–|to)\s*1(:00)? ?(pm|p\.m\.)",
-             r"(?<!not )(?<!don't )(?<!do not )\b(checks? (are )?accepted|accept (personal )?checks)"]
+             r"(?<!not )(?<!don't )(?<!do not )\b(checks? (are )?accepted|accept (personal )?checks)",
+             # Added after the 2026-10-17 final review: the old FAQ's $129 after-hours fee (now $149), the 2023 terms' 2-year
+             # member installation warranty (now 5 years) and registration "on request only" (now every installed unit).
+             r"after[- ]hours[^.]{0,60}\$129|\$129[^.]{0,40}after[- ]hours",
+             r"(?<!non-)(?<!non )\bmembers?\b[^.]{0,30}\b(get|gets|receive|receives|have|has)\s+(an?\s+)?2[- ]year",
+             r"\b(upon|on) (customer |your )?request only\b"]
 FORBIDDEN_MEMBERSHIP = [r"\$149 (per|a|each) year", r"\$149/y",
                         # Archived membership overview: refund and transfer terms the 2026 document replaced. The 2026 terms still offer a
                         # prorated refund within 60 days if no tune-up was done, so only the archive's "unused months" refund is forbidden.

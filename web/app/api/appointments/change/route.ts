@@ -2,7 +2,7 @@ import { z } from "zod";
 import { changeAppointment } from "@/lib/accounts";
 import { findConversation } from "@/lib/conversations";
 import { db } from "@/lib/db";
-import { allow } from "@/lib/ratelimit";
+import { allow, clientIp } from "@/lib/ratelimit";
 import { isConstraintViolation } from "@/lib/scheduling";
 import { requireSession } from "@/lib/session";
 import { record } from "@/lib/telemetry";
@@ -25,7 +25,11 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
   const b = parsed.data;
-  const rl = allow(`confirm:${session.id}`, 10, 60_000);
+  // The demo customers are shared by everyone, so moves and cancellations are also capped per IP and across all visitors
+  // (single instance, counted in memory until a restart).
+  let rl = allow(`confirm:${session.id}`, 10, 60_000);
+  if (rl.ok) rl = allow(`changeip:${clientIp(req)}`, 10, 86_400_000);
+  if (rl.ok) rl = allow("changeall", 60, 86_400_000);
   if (!rl.ok) return Response.json({ error: "rate_limited", retry_after_s: rl.retryAfterS }, { status: 429 });
 
   const conv = findConversation(session.id, b.conversation_id);

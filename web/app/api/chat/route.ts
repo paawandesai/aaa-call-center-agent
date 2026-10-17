@@ -4,7 +4,7 @@ import { getConversation } from "@/lib/conversations";
 import { defaultDeps } from "@/lib/deps";
 import { AgentEvent } from "@/lib/events";
 import { config } from "@/lib/config";
-import { costUsd } from "@/lib/pricing";
+import { costUsd, type Usage } from "@/lib/pricing";
 import { addSpend, allow, clientIp, overSpendCap } from "@/lib/ratelimit";
 import { db } from "@/lib/db";
 import { whenLabel } from "@/lib/scheduling";
@@ -68,19 +68,26 @@ export async function POST(req: Request) {
           write({ type: "error", code: "duplicate_turn", retryable: false });
         } else if (busy.has(lockKey)) {
           write({ type: "error", code: "turn_in_progress", retryable: true });
-        } else if (await overSpendCap(db()).catch(() => false)) {
-          write({ type: "error", code: "capacity", retryable: false });
         } else {
+          // Taken before any await, so two requests for the same conversation can't both start a turn.
           busy.add(lockKey);
+          let usage: Usage | undefined;
           try {
-            const r = await runTurn(defaultDeps(), conv, text!, write, req.signal);
-            if (r.outcome !== "error") conv.turns.set(b.turn_id, conv.messages.length);
-            await addSpend(db(), costUsd(config.model, r.usage)).catch(() => {});
-            void record({ session_id: session.id, turn_id: b.turn_id, kind: "turn", intent: r.intent, outcome: r.outcome,
-              reason: r.handoffReason, latency_ms: Date.now() - started, first_token_ms: r.firstTokenMs, input_tokens: r.inputTokens,
-              output_tokens: r.outputTokens, top_score: r.topScore, meta: { tools: r.toolCalls.join(","), action: b.action ?? null, conversation: b.conversation_id } });
+            // If the spend total can't be read, the turn is refused: the cap fails closed.
+            if (await overSpendCap(db()).catch(() => true)) {
+              write({ type: "error", code: "capacity", retryable: false });
+            } else {
+              const r = await runTurn(defaultDeps(), conv, text!, write, req.signal, b.action === "slot_selected").catch((e) => { usage = (e as { usage?: Usage }).usage; throw e; });
+              usage = r.usage;
+              if (r.outcome !== "error") conv.turns.set(b.turn_id, conv.messages.length);
+              void record({ session_id: session.id, turn_id: b.turn_id, kind: "turn", intent: r.intent, outcome: r.outcome,
+                reason: r.handoffReason, latency_ms: Date.now() - started, first_token_ms: r.firstTokenMs, input_tokens: r.inputTokens,
+                output_tokens: r.outputTokens, top_score: r.topScore, meta: { tools: r.toolCalls.join(","), action: b.action ?? null, conversation: b.conversation_id } });
+            }
           } finally {
             busy.delete(lockKey);
+            // Counted here so a turn the caller abandoned mid-stream still counts toward the daily cap.
+            if (usage) await addSpend(db(), costUsd(config.model, usage)).catch(() => {});
           }
         }
         write({ type: "done", turn_id: b.turn_id, latency_ms: Date.now() - started });

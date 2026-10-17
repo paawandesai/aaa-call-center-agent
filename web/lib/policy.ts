@@ -75,7 +75,8 @@ export function route(text: string, weak = true): Route {
   }
   for (const [re, reason, intent] of HANDOFF) {
     if (!re.test(text)) continue;
-    if (reason === "human_requested" && NO_HUMAN.test(text)) continue; // "I don't want to talk to a person, just book"
+    // A negation only cancels the ask for a person in its own clause: "I don't want a bot, I want a person" still asks.
+    if (reason === "human_requested" && !text.split(/[,.;!?]|\b(?:but|and|though)\b/i).some((cl) => re.test(cl) && !NO_HUMAN.test(cl))) continue; // "I don't want to talk to a person, just book"
     return { kind: "handoff", reason, intent };
   }
   // A ZIP the service-area documents disagree on goes to a person whatever the caller asks, as check_availability would.
