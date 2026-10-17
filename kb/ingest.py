@@ -103,7 +103,8 @@ def parse_png(p: Path) -> tuple[list[tuple[str, str]], dict]:
     text = subprocess.run(["tesseract", str(p), "-"], capture_output=True, text=True, check=True).stdout
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     title = lines[0].title()
-    pieces = [("ocr", f"{title} | {l}") for l in lines[1:]]
+    # One chunk for the whole table: eight one-line holiday chunks crowded regular-hours answers out of the top 5.
+    pieces = [("ocr", f"{title} | " + "; ".join(lines[1:]))]
     return pieces, {"ocr_lines": len(lines) - 1}
 
 

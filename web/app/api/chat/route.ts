@@ -3,6 +3,8 @@ import { runTurn } from "@/lib/agent";
 import { getConversation } from "@/lib/conversations";
 import { defaultDeps } from "@/lib/deps";
 import { AgentEvent } from "@/lib/events";
+import { config } from "@/lib/config";
+import { costUsd } from "@/lib/pricing";
 import { addSpend, allow, overSpendCap } from "@/lib/ratelimit";
 import { whenLabel } from "@/lib/scheduling";
 import { maybeNightlyReset } from "@/lib/reset";
@@ -69,7 +71,7 @@ export async function POST(req: Request) {
           try {
             const r = await runTurn(defaultDeps(), conv, text!, write, req.signal);
             if (r.outcome !== "error") conv.turns.set(b.turn_id, conv.messages.length);
-            addSpend(r.inputTokens, r.outputTokens);
+            addSpend(costUsd(config.model, r.usage));
             void record({ session_id: session.id, turn_id: b.turn_id, kind: "turn", intent: r.intent, outcome: r.outcome,
               reason: r.handoffReason, latency_ms: Date.now() - started, first_token_ms: r.firstTokenMs, input_tokens: r.inputTokens,
               output_tokens: r.outputTokens, top_score: r.topScore, meta: { tools: r.toolCalls.join(","), action: b.action ?? null, conversation: b.conversation_id } });

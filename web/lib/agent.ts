@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { addUsage, emptyUsage, type Usage } from "./pricing";
 import { z } from "zod";
 import { config, now } from "./config";
 import type { Conversation } from "./conversations";
@@ -87,8 +88,9 @@ export interface TurnResult {
   outcome: "answered" | "slots_offered" | "confirm_shown" | "handoff" | "safety" | "deflected" | "error";
   handoffReason?: HandoffReason;
   intent?: string;
-  inputTokens: number;
+  inputTokens: number; // all input, cached or not
   outputTokens: number;
+  usage: Usage;
   topScore?: number;
   firstTokenMs?: number;
   toolCalls: string[];
@@ -114,7 +116,7 @@ const slotEvent = (s: Slot) => ({ slot_id: s.slot_id, date: s.date, window_label
 
 export async function runTurn(deps: Deps, c: Conversation, callerText: string, emit: Emit, signal?: AbortSignal): Promise<TurnResult> {
   const started = Date.now();
-  const res: TurnResult = { outcome: "answered", inputTokens: 0, outputTokens: 0, toolCalls: [] };
+  const res: TurnResult = { outcome: "answered", inputTokens: 0, outputTokens: 0, usage: emptyUsage(), toolCalls: [] };
   const text = callerText.slice(0, 2000);
 
   const scripted = async (reply: string, reason: HandoffReason | null, intent: string) => {
@@ -148,9 +150,10 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     return { ...res, outcome: "deflected", intent: r.intent };
   }
 
-  // 2. Retrieval for this message.
-  emit({ type: "status", phase: "searching_kb" });
-  const passages = (await deps.search(text)).filter((p) => p.score >= config.minRetrievalScore);
+  // 2. Retrieval for this message. A bare ZIP, a slot pick or a name answers the assistant's own question, so it skips the search.
+  const logistics = isLogistics(text);
+  if (!logistics) emit({ type: "status", phase: "searching_kb" });
+  const passages = logistics ? [] : (await deps.search(text)).filter((p) => p.score >= config.minRetrievalScore);
   res.topScore = passages[0]?.score;
   const used: Passage[] = [...passages];
   const notes = [c.caller.zip ? `The caller's ZIP code is ${c.caller.zip}.` : "", ...c.notes.splice(0)].filter(Boolean);
@@ -170,8 +173,8 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
           tool_choice: round < config.maxToolRounds ? { type: "auto" } : { type: "none" },
           thinking: { type: "adaptive" },
           output_config: { effort: config.effort },
-          betas: ["server-side-fallback-2026-07-01"],
-          fallbacks: "default",
+          cache_control: { type: "ephemeral" }, // automatic breakpoint on the growing conversation; the system marker covers tools + system
+          ...(config.serverFallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
           messages: c.messages,
         },
         { signal },
@@ -191,6 +194,8 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
       }
       res.inputTokens += (msg.usage.input_tokens ?? 0) + (msg.usage.cache_read_input_tokens ?? 0) + (msg.usage.cache_creation_input_tokens ?? 0);
       res.outputTokens += msg.usage.output_tokens ?? 0;
+      res.usage = addUsage(res.usage, { input: msg.usage.input_tokens ?? 0, cacheRead: msg.usage.cache_read_input_tokens ?? 0,
+        cacheWrite: msg.usage.cache_creation_input_tokens ?? 0, output: msg.usage.output_tokens ?? 0 });
       c.messages.push({ role: "assistant", content: msg.content as Anthropic.Beta.BetaContentBlockParam[] });
 
       if (msg.stop_reason === "refusal") {
@@ -238,6 +243,12 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     if (sources.length) emit({ type: "sources", sources });
   }
   return res;
+}
+
+// Short replies to the assistant's booking questions: a ZIP, a slot pick from the buttons, or a name.
+const LOGISTICS = [/^\s*(my zip( code)? is\s*)?\d{5}\.?\s*$/i, /^I'll take .+ \(slot_id \d+\)\.$/, /^\s*(it'?s|my name is|i'?m|name'?s)?\s*[A-Z][a-z'-]+( [A-Z][a-z'-]+){0,2}\.?\s*$/];
+export function isLogistics(text: string): boolean {
+  return text.length <= 80 && LOGISTICS.some((r) => r.test(text));
 }
 
 function answerText(c: Conversation): string {

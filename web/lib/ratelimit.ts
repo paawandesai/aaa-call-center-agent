@@ -14,12 +14,12 @@ export function allow(key: string, limit: number, windowMs: number): { ok: true 
   return { ok: true };
 }
 
-// Rough cost guard at list prices (input $4 / output $20 per million tokens). Cached reads are counted at full price.
+// Daily cost guard at list prices (lib/pricing.ts), counting cache reads and writes at their own rates.
 const spend = (g.__spend ??= { day: "", usd: 0 });
 const day = () => new Date().toISOString().slice(0, 10);
-export function addSpend(inputTokens: number, outputTokens: number) {
+export function addSpend(usd: number) {
   if (spend.day !== day()) { spend.day = day(); spend.usd = 0; }
-  spend.usd += (inputTokens * 4 + outputTokens * 20) / 1_000_000;
+  spend.usd += usd;
 }
 export function overSpendCap(): boolean {
   if (spend.day !== day()) return false;

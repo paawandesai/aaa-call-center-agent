@@ -1,6 +1,6 @@
 // Containment eval: September holdout (redacted openings, deterministic gold) + synthetic adversarial set,
 // plus retrieval re-evaluated through the app's own pgvector query. Real model calls (ANTHROPIC_AEA_API_KEY).
-//   npx tsx scripts/run_eval.ts [--limit N] [--only holdout|adversarial]
+//   npx tsx scripts/run_eval.ts [--split holdout|dev] [--limit N] [--only holdout|adversarial]  ("holdout" = the case set chosen by --split)
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -17,18 +17,22 @@ import { searchKb } from "../lib/retrieval";
 import { confirmBooking, findSlots, isConstraintViolation, whenLabel, type ServiceType } from "../lib/scheduling";
 import { loadSeedFromSqlite } from "../lib/seed";
 import { zipLookup } from "../lib/zones";
+import { addUsage, costUsd, emptyUsage, type Usage } from "../lib/pricing";
 import { pgliteDb } from "../test/pglite";
 
 process.env.DEMO_NOW ??= "2026-10-16T15:00:00Z";
 const args = process.argv.slice(2);
 const limit = args.includes("--limit") ? Number(args[args.indexOf("--limit") + 1]) : Infinity;
 const only = args.includes("--only") ? args[args.indexOf("--only") + 1] : "";
+// --split dev tunes on July-August discovery calls; the September holdout is for reported results only.
+const split = args.includes("--split") ? args[args.indexOf("--split") + 1] : "holdout";
+if (!["holdout", "dev"].includes(split)) throw new Error("--split must be holdout or dev");
 const REPO = path.resolve(process.cwd(), "..");
 const DATA = process.env.MERIDIAN_DATA_DIR ?? "/mnt/project-files/data/meridian_dataset";
 const EVAL_DIR = process.env.MERIDIAN_EVAL_DIR ?? "/mnt/project-files/data/eval";
 
 type Outcome = "safety" | "handoff" | "booked" | "answered" | "confirm_pending" | "error";
-interface Trace { outcome: Outcome; reason?: string; texts: string[]; events: AgentEvent[]; booked?: { service: string }; inTok: number; outTok: number; turns: number; offered: Set<number>; pendingSlot?: number }
+interface Trace { outcome: Outcome; reason?: string; texts: string[]; events: AgentEvent[]; booked?: { service: string }; inTok: number; outTok: number; usage: Usage; turns: number; offered: Set<number>; pendingSlot?: number }
 
 const wilson = (k: number, n: number): [number, number] => {
   if (n === 0) return [0, 0];
@@ -51,7 +55,7 @@ const SERVICE_OF: Record<string, ServiceType> = { "Heating or cooling repair": "
 async function converse(id: string, turns: string[], sim?: { zip: string; opening: string }): Promise<Trace> {
   await d.query(`INSERT INTO sessions (session_id, role, expires_at) VALUES ($1,'caller', now() + interval '1 day') ON CONFLICT DO NOTHING`, [`eval-${id}`]);
   const c = getConversation(`eval-${id}`, `case-${id}`);
-  const t: Trace = { outcome: "answered", texts: [], events: [], inTok: 0, outTok: 0, turns: 0, offered: new Set() };
+  const t: Trace = { outcome: "answered", texts: [], events: [], inTok: 0, outTok: 0, usage: emptyUsage(), turns: 0, offered: new Set() };
   const queue = [...turns];
   for (let i = 0; i < 7; i++) {
     let text = queue.shift();
@@ -75,7 +79,7 @@ async function converse(id: string, turns: string[], sim?: { zip: string; openin
     let reply = "";
     const r = await runTurn(deps, c, text, (e) => { if (e.type === "text_delta") reply += e.text; else if (e.type === "text_discard") reply = reply.slice(0, reply.length - e.chars); else t.events.push(e); });
     t.texts.push(reply);
-    t.inTok += r.inputTokens; t.outTok += r.outputTokens;
+    t.inTok += r.inputTokens; t.outTok += r.outputTokens; t.usage = addUsage(t.usage, r.usage);
     for (const s of c.offered.keys()) t.offered.add(s);
     // The chosen slot was taken before the card appeared: the simulated caller picks again from the new options.
     if (t.events.slice(before).some((e) => e.type === "booking_failed")) t.pendingSlot = undefined;
@@ -109,9 +113,9 @@ const FALSE_BOOKING = rx(String.raw`\b(you'?re|you are|i'?ve|i have|it'?s|is now
 // ---------- holdout ----------
 const out: Record<string, unknown> = {};
 const caseLog: unknown[] = [];
-let inTok = 0, outTok = 0;
+let inTok = 0, outTok = 0, usage = emptyUsage();
 if (only !== "adversarial") {
-  const H = JSON.parse(readFileSync(path.join(EVAL_DIR, "holdout_cases.json"), "utf8")) as {
+  const H = JSON.parse(readFileSync(path.join(EVAL_DIR, `${split}_cases.json`), "utf8")) as {
     forbidden: string[]; forbidden_membership: string[];
     cases: { id: string; driver: string; intent: string; opening: string; zip: string; expected: { outcome: string; services?: string[]; required?: string[] } }[];
   };
@@ -127,7 +131,7 @@ if (only !== "adversarial") {
       if (!avail.length) exp = "handoff";
     }
     const t = await converse(k.id, [k.opening], { zip: k.zip, opening: k.opening });
-    inTok += t.inTok; outTok += t.outTok;
+    inTok += t.inTok; outTok += t.outTok; usage = addUsage(usage, t.usage);
     const all = t.texts.join("\n");
     const checks: string[] = [];
     const forb = [...H.forbidden, ...(k.intent.startsWith("membership") ? H.forbidden_membership : [])];
@@ -154,8 +158,8 @@ if (only !== "adversarial") {
     rows.push({ id: k.id, driver: k.driver, expected: exp, got: t.outcome + (t.reason ? `:${t.reason}` : ""), contained, correct, checks,
       escalateExpected: exp === "handoff" || exp === "safety", escalated: t.outcome === "handoff" || t.outcome === "safety",
       inScope: exp === "booked" || exp === "answered" });
-    caseLog.push({ set: "holdout", id: k.id, intent: k.intent, expected: exp, outcome: t.outcome, reason: t.reason, checks, turns: t.turns, texts: t.texts });
-    if (++done % 10 === 0) console.log(`holdout ${done}/${cases.length} tokens in=${inTok} out=${outTok}`);
+    caseLog.push({ set: split, id: k.id, intent: k.intent, expected: exp, outcome: t.outcome, reason: t.reason, checks, turns: t.turns, texts: t.texts });
+    if (++done % 10 === 0) console.log(`${split} ${done}/${cases.length} tokens in=${inTok} out=${outTok}`);
   };
   const pool = [...cases];
   await Promise.all(Array.from({ length: 4 }, async () => { while (pool.length) await work(pool.shift()!); }));
@@ -190,7 +194,7 @@ if (only !== "holdout") {
   for (const k of A.cases.slice(0, limit)) {
     const before = (await d.query<{ n: number }>(`SELECT count(*)::int AS n FROM appointments`)).rows[0].n;
     const t = await converse(k.id, k.turns);
-    inTok += t.inTok; outTok += t.outTok;
+    inTok += t.inTok; outTok += t.outTok; usage = addUsage(usage, t.usage);
     const all = t.texts.join("\n") + "\n" + t.events.filter((e) => e.type === "safety").map((e) => (e as { text: string }).text).join("\n");
     const after = (await d.query<{ n: number }>(`SELECT count(*)::int AS n FROM appointments`)).rows[0].n;
     const checks: string[] = [];
@@ -220,12 +224,20 @@ for (const it of R.items) {
 out.retrieval = { hit5: rate(hits, R.items.length), mrr: mrr / R.items.length, where: "app query on pgvector (PGlite), dev set" };
 
 const runId = new Date().toISOString().replace(/[-:]/g, "").slice(0, 13) + "-" + randomBytes(2).toString("hex");
-const configId = createHash("sha256").update(JSON.stringify([config.model, config.effort, config.maxTokens, SYSTEM_PROMPT, "thinking:adaptive"])).digest("hex").slice(0, 10);
-const cost = (inTok * 4 + outTok * 20) / 1e6;
-const summary = { run_id: runId, created_at: new Date().toISOString(), config_id: configId, prompt_version: config.promptVersion, demo_now: process.env.DEMO_NOW,
-  tokens: { input: inTok, output: outTok, est_cost_usd: Number(cost.toFixed(2)) }, ...out };
+const configId = createHash("sha256").update(JSON.stringify([config.model, config.effort, config.maxTokens, SYSTEM_PROMPT, "thinking:adaptive",
+  config.retrievalK, config.minRetrievalScore])).digest("hex").slice(0, 10);
+const cost = costUsd(config.model, usage);
+const nCases = caseLog.length;
+const summary = { run_id: runId, created_at: new Date().toISOString(), config_id: configId, prompt_version: config.promptVersion, split, demo_now: process.env.DEMO_NOW,
+  tokens: { input: inTok, output: outTok, uncached_input: usage.input, cache_read: usage.cacheRead, cache_write: usage.cacheWrite,
+    est_cost_usd: Number(cost.toFixed(2)), est_cost_per_case_usd: Number((cost / Math.max(1, nCases)).toFixed(4)) }, ...out };
 mkdirSync(EVAL_DIR, { recursive: true });
 writeFileSync(path.join(EVAL_DIR, `run_${runId}.json`), JSON.stringify({ summary, cases: caseLog }, null, 1)); // contains model text: kept outside the repo
-if (!Number.isFinite(limit) && !only) writeFileSync(path.join(REPO, "eval/results/containment_holdout.json"), JSON.stringify(summary, null, 1) + "\n");
+if (!Number.isFinite(limit) && !only && split === "holdout") writeFileSync(path.join(REPO, "eval/results/containment_holdout.json"), JSON.stringify(summary, null, 1) + "\n");
+// Every full dev run is kept (metadata and labels only), so the tuning history is visible.
+if (!Number.isFinite(limit) && split === "dev") {
+  mkdirSync(path.join(REPO, "eval/results/dev_runs"), { recursive: true });
+  writeFileSync(path.join(REPO, `eval/results/dev_runs/${runId}.json`), JSON.stringify({ ...summary, note: process.env.EVAL_NOTE ?? "" }, null, 1) + "\n");
+}
 console.log(JSON.stringify(summary, (k, v) => (k === "cases" || k === "per_driver" ? undefined : v), 1));
 await d.close();

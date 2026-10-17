@@ -1,0 +1,702 @@
+[
+{
+"id": "00550335eb",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_info",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "011557843e",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_upgrade",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "0f2686cfbf",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_renewal",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "101558ff74",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_info",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "12233f0600",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_renewal",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "17437baeeb",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_cancel",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "217fdaa8d1",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_cancel",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "2cc9e4b159",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_info",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "2f8c9f82c2",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_info",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "352b5ce16f",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_info",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "35ae208eaa",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_renewal",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "3931875ec8",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_upgrade",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "3e63dcf156",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_info",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "3f86e107f1",
+"driver": "Membership (Comfort Club)",
+"intent": "membership_info",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "00daa28e52",
+"driver": "Billing and payments",
+"intent": "duplicate_charge",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "024f8b293c",
+"driver": "Billing and payments",
+"intent": "refund_request",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "053493daff",
+"driver": "Billing and payments",
+"intent": "billing_dispute",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "0fe6c19bc4",
+"driver": "Billing and payments",
+"intent": "refund_request",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "101c8cf7c8",
+"driver": "Billing and payments",
+"intent": "autopay_setup",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "133c63cdbc",
+"driver": "Billing and payments",
+"intent": "pay_invoice",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "1cababf08b",
+"driver": "Billing and payments",
+"intent": "pay_invoice",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "1e298d56e1",
+"driver": "Billing and payments",
+"intent": "duplicate_charge",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "259cc6eab1",
+"driver": "Billing and payments",
+"intent": "autopay_setup",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "274268529d",
+"driver": "Billing and payments",
+"intent": "duplicate_charge",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "2757ac7ada",
+"driver": "Billing and payments",
+"intent": "billing_dispute",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "302ff14b46",
+"driver": "Billing and payments",
+"intent": "autopay_setup",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "31de16c991",
+"driver": "Billing and payments",
+"intent": "duplicate_charge",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "3328dd98ca",
+"driver": "Billing and payments",
+"intent": "pay_invoice",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "351a69f55e",
+"driver": "Billing and payments",
+"intent": "pay_invoice",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "39a230b851",
+"driver": "Billing and payments",
+"intent": "billing_dispute",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "3e6fc0213b",
+"driver": "Billing and payments",
+"intent": "pay_invoice",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "4904c82b5a",
+"driver": "Billing and payments",
+"intent": "autopay_setup",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "519e49bdc9",
+"driver": "Billing and payments",
+"intent": "pay_invoice",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "5209761d4a",
+"driver": "Billing and payments",
+"intent": "autopay_setup",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "569f49f863",
+"driver": "Billing and payments",
+"intent": "pay_invoice",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "58f5fadfa8",
+"driver": "Billing and payments",
+"intent": "pay_invoice",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "011601c731",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "05058df704",
+"driver": "Repair / service booking",
+"intent": "tune_up",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "06ec3e6be0",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "08d35c61cb",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "0cb3337579",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "0de8d69e05",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "10541611dc",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "109a9c2b19",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "13cf267bc0",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "13edc873b6",
+"driver": "Repair / service booking",
+"intent": "tune_up",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "17d62b4235",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "18b3ad60af",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "195e001474",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "19c5adb45d",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "1e55f04ea9",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "2051b6a2e3",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "217c73127b",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "2522883b4c",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "25ad2b1ee0",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "26d201914d",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "28e6c0bd35",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "299468b445",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "2d16ef0259",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "2d71589f9f",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "2dd26254af",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "4764028e34",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "4d09904089",
+"driver": "Repair / service booking",
+"intent": "repair_booking",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "02da308cfb",
+"driver": "System replacement estimate",
+"intent": "replacement_estimate",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "25aed55433",
+"driver": "System replacement estimate",
+"intent": "replacement_estimate",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "30c78b98a6",
+"driver": "System replacement estimate",
+"intent": "replacement_estimate",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "05432bbfe2",
+"driver": "Existing appointment",
+"intent": "appt_confirm",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "08e54bf362",
+"driver": "Existing appointment",
+"intent": "appt_confirm",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "0e2641db70",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "14a86b35d1",
+"driver": "Existing appointment",
+"intent": "appt_confirm",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "37b400b3a9",
+"driver": "Existing appointment",
+"intent": "tech_late",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "3db9067338",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "40ea109725",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "5c0ce8a612",
+"driver": "Existing appointment",
+"intent": "tech_late",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "09bb599abd",
+"driver": "Complaint / escalation request",
+"intent": "complaint_manager",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "0cc8ca35dc",
+"driver": "Complaint / escalation request",
+"intent": "complaint_manager",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "159d03916c",
+"driver": "Complaint / escalation request",
+"intent": "complaint_manager",
+"zip": "78664",
+"expected": "handoff"
+},
+{
+"id": "399c8cd156",
+"driver": "Complaint / escalation request",
+"intent": "complaint_manager",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "4aac6d3ab9",
+"driver": "Complaint / escalation request",
+"intent": "complaint_manager",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "0a555ca72a",
+"driver": "Warranty",
+"intent": "warranty_registration",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "0c3fc0f8fc",
+"driver": "Warranty",
+"intent": "warranty_coverage",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "1232fd83bb",
+"driver": "Warranty",
+"intent": "warranty_claim",
+"zip": "78745",
+"expected": "booked"
+},
+{
+"id": "13f5ceab24",
+"driver": "Warranty",
+"intent": "warranty_coverage",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "1b6ba7522a",
+"driver": "Warranty",
+"intent": "warranty_transfer",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "1ebcb0f14d",
+"driver": "Warranty",
+"intent": "warranty_claim",
+"zip": "78664",
+"expected": "booked"
+},
+{
+"id": "20bf8fb6ac",
+"driver": "Warranty",
+"intent": "warranty_registration",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "20fce13639",
+"driver": "Warranty",
+"intent": "warranty_claim",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "22a95cf433",
+"driver": "Warranty",
+"intent": "warranty_claim",
+"zip": "78640",
+"expected": "booked"
+},
+{
+"id": "34c4855726",
+"driver": "Warranty",
+"intent": "warranty_coverage",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "35e9ceeff5",
+"driver": "Warranty",
+"intent": "warranty_registration",
+"zip": "78745",
+"expected": "handoff"
+},
+{
+"id": "4149a0db1e",
+"driver": "Warranty",
+"intent": "warranty_registration",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "0b9ae4da02",
+"driver": "Safety emergency",
+"intent": "safety_emergency",
+"zip": "78745",
+"expected": "safety"
+},
+{
+"id": "1af472c8dc",
+"driver": "Safety emergency",
+"intent": "safety_emergency",
+"zip": "78745",
+"expected": "safety"
+},
+{
+"id": "2a39617726",
+"driver": "Safety emergency",
+"intent": "safety_emergency",
+"zip": "78640",
+"expected": "safety"
+},
+{
+"id": "36b6ecc522",
+"driver": "Safety emergency",
+"intent": "safety_emergency",
+"zip": "78745",
+"expected": "safety"
+},
+{
+"id": "5b79803625",
+"driver": "Safety emergency",
+"intent": "safety_emergency",
+"zip": "78745",
+"expected": "safety"
+},
+{
+"id": "6373e93995",
+"driver": "Safety emergency",
+"intent": "safety_emergency",
+"zip": "78664",
+"expected": "safety"
+},
+{
+"id": "0f4c21c825",
+"driver": "Other (redirect)",
+"intent": "job_inquiry",
+"zip": "78640",
+"expected": "handoff"
+},
+{
+"id": "10b56da0f1",
+"driver": "Other (redirect)",
+"intent": "wrong_number",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "4a07fa0c54",
+"driver": "Other (redirect)",
+"intent": "job_inquiry",
+"zip": "78745",
+"expected": "handoff"
+}
+]
