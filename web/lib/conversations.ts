@@ -25,6 +25,7 @@ export interface Conversation {
   steps: string[];
   caller: { zip?: string; name?: string };
   notes: string[]; // app events (e.g. a confirmed booking) passed to the model with the next caller message
+  lastBooking?: { key: string; body: unknown }; // the confirm route's last success, so a retried Confirm gets the same answer
   turns: Map<string, number>; // turn_id -> message count after the turn, for retry dedupe
   updatedAt: number;
 }

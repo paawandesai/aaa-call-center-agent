@@ -4,8 +4,14 @@ import type { Queryable } from "./db";
 const g = globalThis as { __rl?: Map<string, { start: number; count: number }> };
 const windows = (g.__rl ??= new Map());
 
+let lastPrune = 0;
 export function allow(key: string, limit: number, windowMs: number): { ok: true } | { ok: false; retryAfterS: number } {
   const now = Date.now();
+  // Drop windows older than the longest one in use (a day), at most once a minute, so the map can't grow without bound.
+  if (now - lastPrune > 60_000) {
+    lastPrune = now;
+    for (const [k, v] of windows) if (now - v.start > 86_400_000) windows.delete(k);
+  }
   const w = windows.get(key);
   if (!w || now - w.start >= windowMs) {
     windows.set(key, { start: now, count: 1 });

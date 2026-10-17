@@ -30,6 +30,8 @@ export async function POST(req: Request) {
   if (!rl.ok) return Response.json({ error: "rate_limited", retry_after_s: rl.retryAfterS }, { status: 429 });
 
   const conv = findConversation(session.id, b.conversation_id);
+  // A retried Confirm (same idempotency key) after a success gets the booking back, not an error.
+  if (conv?.lastBooking?.key === b.idempotency_key) return Response.json(conv.lastBooking.body);
   const p = conv?.pending;
   if (!conv || !p || p.slot_id !== b.slot_id || p.name.toLowerCase() !== b.name.toLowerCase() || conv.safetyLock) {
     return Response.json({ type: "booking_failed", reason: "error", slots: [] }, { status: 409 });
@@ -48,7 +50,9 @@ export async function POST(req: Request) {
     conv.steps.push("booked");
     (conv.bookedRefs ??= []).push(result.ref);
     conv.notes.push(`The caller pressed Confirm and the app booked the ${result.service.toLowerCase()} for ${result.when_label}, reference ${result.ref}. The app already showed them the booking details.`);
-    return Response.json({ type: "booked", ref: result.ref, when_label: result.when_label, tz: result.tz, service: result.service, tech_first_name: result.tech_first_name });
+    const body = { type: "booked", ref: result.ref, when_label: result.when_label, tz: result.tz, service: result.service, tech_first_name: result.tech_first_name };
+    conv.lastBooking = { key: b.idempotency_key, body };
+    return Response.json(body);
   }
   let slots: { slot_id: number; date: string; window_label: string; tz: "America/Chicago" }[] = [];
   if (result.reason === "slot_taken") {

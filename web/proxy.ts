@@ -2,6 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Only CSP nonce and headers here. Authorization happens in each route handler and server component.
 export function proxy(request: NextRequest) {
+  // API writes: refuse oversized bodies and requests a browser marks as cross-site (cookies are SameSite=Strict too).
+  if (request.method === "POST" && request.nextUrl.pathname.startsWith("/api/")) {
+    if (Number(request.headers.get("content-length") ?? 0) > 32_768) return new NextResponse(null, { status: 413 });
+    const site = request.headers.get("sec-fetch-site");
+    if (site && site !== "same-origin" && site !== "none") return new NextResponse(null, { status: 403 });
+  }
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const dev = process.env.NODE_ENV !== "production";
   const csp = [

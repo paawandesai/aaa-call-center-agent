@@ -66,7 +66,7 @@ export default async function Evaluation() {
           <h2 id="c1" className="h2">Containment against the ceiling</h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 32 }}>
             <div className="stat"><span className="label">Measured</span><span className="value">{pct(r.containment.rate)}</span><span className="small muted">{ci(r.containment)}</span></div>
-            <div className="stat"><span className="label">Ceiling</span><span className="value">{pct(r.ceiling.rate)}</span><span className="small muted">Share of calls in handled drivers</span></div>
+            <div className="stat"><span className="label">Ceiling</span><span className="value">{pct(r.ceiling.rate)}</span><span className="small muted">Share of calls the agent may handle; excludes calls that go to a person and booking calls whose zone had no openings</span></div>
             <div className="stat"><span className="label">Brief&apos;s target</span><span className="value">{pct(r.target[0])}–{pct(r.target[1])}</span><span className="small muted">Shown for reference</span></div>
           </div>
           <svg role="img" viewBox="0 0 1000 64" style={{ width: "100%", height: 64 }}

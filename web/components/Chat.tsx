@@ -25,6 +25,7 @@ const ERRORS: Record<string, string> = {
   duplicate_turn: "That message was already handled.",
   change_slot_taken: "That new time was just taken. Ask me for other times.",
   change_error: "I couldn't make that change. Ask for a person and they'll take care of it.",
+  conversation_limit: "This chat has reached its length limit. Start a new chat, or ask for a person.",
   turn_in_progress: "I'm still answering your last message.",
   safety_check_failed: "I couldn't check that message just now. Please send it again. If anyone is in danger, call 911.",
 };

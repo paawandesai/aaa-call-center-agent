@@ -1,5 +1,4 @@
 import { db } from "@/lib/db";
-import { config } from "@/lib/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,10 +17,8 @@ export async function GET() {
     const resetOk = !!r.last_reset && Date.now() - new Date(r.last_reset).getTime() < 26 * 3600_000;
     const errorsOk = r.turns_1h < 5 || r.errors_1h / r.turns_1h < 0.5;
     const ok = r.chunks > 0 && r.slots > 0 && resetOk && errorsOk;
-    return Response.json({
-      ok, model: config.model, prompt_version: config.promptVersion, last_reset: r.last_reset, last_reply: r.last_reply,
-      turns_last_hour: r.turns_1h, errors_last_hour: r.errors_1h, checks: { data: r.chunks > 0 && r.slots > 0, reset: resetOk, errors: errorsOk },
-    }, { status: ok ? 200 : 503 });
+    // Public, so it reports only pass/fail; the staff dashboard shows the details.
+    return Response.json({ ok, checks: { data: r.chunks > 0 && r.slots > 0, reset: resetOk, errors: errorsOk } }, { status: ok ? 200 : 503 });
   } catch {
     return Response.json({ ok: false, checks: { database: false } }, { status: 503 });
   }

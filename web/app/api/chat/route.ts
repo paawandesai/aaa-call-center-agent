@@ -66,6 +66,9 @@ export async function POST(req: Request) {
       try {
         if (conv.turns.has(b.turn_id)) {
           write({ type: "error", code: "duplicate_turn", retryable: false });
+        } else if (conv.turns.size >= 40) {
+          // A long chat is cut off rather than growing without bound in memory; the caller can start a new one.
+          write({ type: "error", code: "conversation_limit", retryable: false });
         } else if (busy.has(lockKey)) {
           write({ type: "error", code: "turn_in_progress", retryable: true });
         } else {
