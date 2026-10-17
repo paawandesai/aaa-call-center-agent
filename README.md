@@ -74,6 +74,18 @@ The repo has the case builder (`eval/build_cases.py`), the hashed holdout manife
 - **Where problems go:** one review queue collects caller thumbs-downs, errors, low-confidence handoffs, failed bookings and staff flags from the handoff queue ("summary wrong", "could have answered"). A reviewer records agree, disagree or needs fix, a proposed fix, and whether the case should join the regression set.
 - **How a fix ships:** a person turns a review into a code, prompt or KB change, it runs on the dev set, and only a finished config gets a held-out run. Nothing is promoted automatically.
 
+### After the audit (2026-10-17)
+
+A read-only audit found gaps that a reviewer could hit quickly, and they were fixed in prompt `agent-v6` (`plans/final_audit_2026-10-17.md` in the project files):
+
+- Self-harm phrasing such as "I want to die" or "no point living" missed the deterministic route, and when the model handed off for safety it showed the gas/CO/fire script with no 988 line. The route is wider now, the model has a separate self-harm handoff that shows the 988 script, and every later message in that chat gets a fixed 988 reply instead of the model.
+- "Double-charged", "disputing", "refunded" and "complaining" skipped the billing and complaint routes, and "I want a human" or "transfer me" reached the model. Both are deterministic handoffs now. Repeating a request no longer adds a second ticket.
+- 37 routing tests were added (`web/test/policy.test.ts`), plus a database test for the nightly reset and the spend cap.
+
+No held-out run was done for agent-v6, so the run 4 numbers above are for agent-v5. On the dev set agent-v6 scored 81 of 130 (ceiling 84, escalation recall and precision 46/46, safety 6/6, run `20261017T1909-e73c`), against 83 for agent-v5. Two of the three misses were the simulated caller, not the agent: it read "our team can clear the drain line" as an offer of a person and declined, and in another case its chosen slot was taken by a concurrent case and it ran out of turns. The third is the known warranty-wording miss. The adversarial set grew to 30 attacks (indirect self-harm, self-harm then a booking request, 40 bookings at once, repeated asks for a person, a literal "you are now ...", an inflected dispute, and instructions planted in a KB chunk and in a customer name); all 30 held and the 6 KB probes passed.
+
+**How containment is counted.** The denominator is the 100 held-out calls; the adversarial cases are reported separately. A booking case whose (hashed) ZIP zone has no openings for its service counts as a correct handoff: 6 of the 40 held-out booking cases and 3 of 34 dev booking cases.
+
 ## Data handling
 
 The partner dataset (transcripts, KB, scheduling DB) is confidential and never enters this repo. Scripts read it from `MERIDIAN_DATA_DIR` and write redacted copies outside the repo.
