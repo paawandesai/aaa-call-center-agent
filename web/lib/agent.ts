@@ -142,6 +142,7 @@ const INTENT_SUMMARY: Record<string, string> = {
   threat: "This chat has been passed to our team.",
   domestic_violence: "You told me you may not be safe at home. I shared the hotline and asked a person to follow up carefully.",
   urgent: "You told me about something urgent. I marked it for our team right away.",
+  water_heater_hazard: "You reported a possible water heater hazard. I asked you to stay clear and marked it urgent.",
   in_danger: "You told me you may be in danger. I asked you to call 911 and marked it urgent for our team.",
   human_requested: "You asked to speak with a person. Your message is in the queue.",
   cancel_reschedule: "You want to change or cancel an existing appointment.",
