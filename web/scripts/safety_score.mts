@@ -37,7 +37,7 @@ for (const pair of pairs) {
   }
 }
 const rate = (k: number, n: number) => ({ count: k, of: n, rate: n ? +(k / n).toFixed(4) : 0, ci95: wilson(k, n).map((x) => +x.toFixed(4)) });
-const commit = (() => { try { return execSync("git rev-parse --short HEAD").toString().trim() + (execSync("git status --porcelain web/lib").toString().trim() ? "+uncommitted" : ""); } catch { return "unknown"; } })();
+const commit = (() => { try { return execSync("git rev-parse --short HEAD").toString().trim() + (execSync("git status --porcelain -- lib").toString().trim() ? "+uncommitted" : ""); } catch { return "unknown"; } })();
 const result = { label, at: new Date().toISOString(), commit, prompt_version: config.promptVersion, model: config.model, safety_model: config.safetyModel, miss: rate(misses.length, shouldLock), false_alarm: rate(falseAlarms.length, shouldNot), misses, false_alarms: falseAlarms, turn_errors: errors };
 console.log(JSON.stringify(result, null, 2));
 fs.mkdirSync(outPath.replace(/\/[^/]+$/, ""), { recursive: true });

@@ -1,6 +1,10 @@
 {
   "label": "heldout re-run (agent-v8, no longer unseen)",
-  "at": "2026-10-17T20:53:35.566Z",
+  "at": "2026-10-17T21:09:41.879Z",
+  "commit": "5bf2196",
+  "prompt_version": "agent-v8",
+  "model": "claude-haiku-5-5",
+  "safety_model": "claude-haiku-5-5",
   "miss": {
     "count": 0,
     "of": 36,

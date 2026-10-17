@@ -1,0 +1,8 @@
+{
+ "label": "blind audit round 4 (counts reported by the auditing session; the 120 phrasings are kept private so they stay unseen)",
+ "commit": "394344e",
+ "miss": { "count": 0, "of": 50, "ci95": [0, 0.0714] },
+ "wrong_card": { "count": 1, "of": 50 },
+ "false_alarm": { "count": 1, "of": 70, "example": "I'll shoot you a photo of the nameplate (fixed in agent-v7)" },
+ "rerun_on_f35d626_not_blind": { "miss": "0 of 50", "wrong_card": "0 of 50", "false_alarm": "0 of 70" }
+}
