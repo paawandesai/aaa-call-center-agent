@@ -17,7 +17,7 @@ const OUTCOMES: [string, string | null, string | null, number][] = [
 
 // Waiting handoffs for the queue. Summaries are invented and contain no personal details.
 const HANDOFFS: { reason: string; intent: string | null; mins: number; status: string; steps: string[]; caller: Record<string, string>; summary: string; excerpt: string }[] = [
-  { reason: "safety", intent: "burning_smell", mins: 3, status: "open", steps: [], caller: {}, summary: "Routed by policy (burning_smell). Safety script shown.", excerpt: "theres a burning smell from the furnace when it kicks on" },
+  { reason: "safety", intent: "burning_smell", mins: 3, status: "open", steps: [], caller: {}, summary: "Sent by a fixed rule, not written by AI: burning smell. Safety script shown.", excerpt: "theres a burning smell from the furnace when it kicks on" },
   { reason: "billing_account", intent: "billing", mins: 11, status: "open", steps: [], caller: { name: "Demo Caller" }, summary: "Caller says their last invoice is higher than the quote and wants it reviewed.", excerpt: "my invoice [INVOICE_ID] is way more than I was quoted" },
   { reason: "service_area_unclear", intent: null, mins: 18, status: "open", steps: ["check_availability", "handoff"], caller: { zip: "78734" }, summary: "Caller wants a tune-up in Lakeway; service-area documents disagree, so coverage needs a person.", excerpt: "can you send someone to lakeway for a tune up next week" },
   { reason: "human_requested", intent: "human_requested", mins: 26, status: "open", steps: [], caller: {}, summary: "Caller asked for a person right away.", excerpt: "just let me talk to a real person please" },
@@ -87,7 +87,7 @@ export async function seedDemoActivity(q: Queryable, now = new Date()) {
       `INSERT INTO handoffs (created_at, session_id, reason, intent, steps_tried, caller_provided, summary, status, resolution)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id::int AS id`,
       [new Date(now.getTime() - h.mins * 60_000), `${DEMO_PREFIX}${randomBytes(6).toString("hex")}`, h.reason, h.intent, JSON.stringify(h.steps),
-        JSON.stringify({ ...h.caller, verified: false }), `AI-written: ${h.summary}\nCaller's last message (redacted): ${h.excerpt}`, h.status,
+        JSON.stringify({ ...h.caller, verified: false }), `${h.summary.startsWith("Sent by a fixed rule") ? "" : "AI-written: "}${h.summary}\nCaller's last message (redacted): ${h.excerpt}`, h.status,
         h.status === "resolved" ? "resolved_by_staff" : null]);
     ids.push(ins[0].id);
   }
