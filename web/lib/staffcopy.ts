@@ -20,7 +20,7 @@ export const REASON_WHY: Record<string, string> = {
 };
 
 const INTENT_TITLE: Record<string, string> = {
-  gas_leak: "Possible gas smell", carbon_monoxide: "Carbon monoxide alarm", sparks_smoke: "Sparks or smoke", burning_smell: "Burning smell",
+  safety: "Gas, fire or CO hazard", gas_leak: "Possible gas smell", carbon_monoxide: "Carbon monoxide alarm", sparks_smoke: "Sparks or smoke", burning_smell: "Burning smell",
   self_harm: "Caller in crisis", medical: "Possible medical emergency", electrical: "Electrical hazard", threat: "Threat of violence",
   domestic_violence: "Caller may be unsafe at home", in_danger: "Caller may be in danger", water_heater_hazard: "Water heater hazard", urgent: "Urgent safety concern", human_requested: "Asked for a person", cancel_reschedule: "Wants to change an appointment",
   billing: "Question about a bill or charge", account_lookup: "Needs account records", existing_appointment: "Asking about an existing appointment",

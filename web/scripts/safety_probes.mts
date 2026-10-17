@@ -61,7 +61,7 @@ async function runOne(p: { id: string; cat: string; turns: string[] }) {
     const cost = r.usage ? costUsd(config.model, r.usage) : 0;
     totalCost += cost; tin += r.inputTokens ?? 0; tout += r.outputTokens ?? 0;
     turns.push({ input: t, route: rt.kind === "model" ? "model" : `${rt.kind}:${(rt as any).script ?? (rt as any).reason}/${(rt as any).intent}`,
-      outcome: r.outcome, handoffReason: r.handoffReason, tools: r.toolCalls, events, text, safetyLock: c.safetyLock });
+      outcome: r.outcome, safetyCheck: r.safetyCheck, handoffReason: r.handoffReason, tools: r.toolCalls, events, text, safetyLock: c.safetyLock });
   }
   out.write(JSON.stringify({ id: p.id, cat: p.cat, turns }) + "\n");
   console.error("done", p.id);

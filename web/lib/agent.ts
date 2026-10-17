@@ -7,6 +7,7 @@ import type { Db } from "./db";
 import type { Emit } from "./events";
 import { createHandoff } from "./handoffs";
 import { HANDOFF_COPY, route, SCRIPTS, type HandoffReason, type SafetyScript } from "./policy";
+import { classifySafety, VERDICT_INTENT, VERDICT_SCRIPT, verdictLocks } from "./safety";
 import { SYSTEM_PROMPT, turnData } from "./prompt";
 import type { Passage } from "./retrieval";
 import { FEE_LABEL, findSlots, isSlotAvailable, SERVICE_LABEL, whenLabel, type ServiceType, type Slot } from "./scheduling";
@@ -128,10 +129,12 @@ export interface TurnResult {
   topScore?: number;
   firstTokenMs?: number;
   toolCalls: string[];
+  safetyCheck?: string; // the classifier's result: clear, failed, or the hazard category it locked on
 }
 
 // What the caller sees under "What I've passed on" for policy-routed handoffs.
 const INTENT_SUMMARY: Record<string, string> = {
+  safety: "You reported a possible gas, fire or carbon monoxide hazard. I showed the safety steps and marked it urgent.",
   gas_leak: "You reported a possible gas smell. I showed the safety steps and marked it urgent.",
   carbon_monoxide: "You reported a carbon monoxide alarm. I showed the safety steps and marked it urgent.",
   sparks_smoke: "You reported sparks or smoke. I showed the safety steps and marked it urgent.",
@@ -175,8 +178,28 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     }
   };
 
-  // 1. Deterministic policy runs first. Safety is one-way.
-  const r = route(text);
+  // 1. Safety runs first and is one-way. Unambiguous phrases lock at once. Every other message also goes to the safety
+  // classifier, which confirms or rejects an ambiguous rule hit ("kill me", "smoke") and catches wording no rule has.
+  // It can add a lock, never remove one. If it can't run, an ambiguous hit locks, and any other message goes unanswered
+  // with a retry, so no message reaches the model unscreened.
+  let r = route(text);
+  let searchEarly: Promise<Passage[]> | undefined;
+  if (!(r.kind === "safety" && r.tier !== "weak") && !c.selfHarm && !isData(text)) {
+    // The knowledge-base search starts alongside the check so the check adds little wait to an ordinary question.
+    if (r.kind === "model" && !isLogistics(text)) { searchEarly = deps.search(text); searchEarly.catch(() => {}); }
+    const { verdict, usage } = await classifySafety(deps.anthropic, text, lastAssistantText(c), signal);
+    res.usage = addUsage(res.usage, usage);
+    res.safetyCheck = !verdict ? "failed" : verdictLocks(verdict) ? verdict.category : "clear";
+    if (verdict && verdictLocks(verdict)) {
+      const script = VERDICT_SCRIPT[verdict.category as keyof typeof VERDICT_SCRIPT];
+      if (!(r.kind === "safety" && r.script === script)) r = { kind: "safety", script, intent: VERDICT_INTENT[verdict.category as keyof typeof VERDICT_INTENT] };
+    } else if (verdict) {
+      if (r.kind === "safety") r = route(text, false);
+    } else if (r.kind !== "safety") {
+      emit({ type: "error", code: "safety_check_failed", retryable: true });
+      return { ...res, outcome: "error" };
+    }
+  }
   if (r.kind === "safety") {
     lockForSafety(c, r.script);
     const reason: HandoffReason = r.script === "threat" ? "adversarial" : "safety";
@@ -207,7 +230,7 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
   // 2. Retrieval for this message. A bare ZIP, a slot pick or a name answers the assistant's own question, so it skips the search.
   const logistics = isLogistics(text);
   if (!logistics) emit({ type: "status", phase: "searching_kb" });
-  const passages = logistics ? [] : (await deps.search(text)).filter((p) => p.score >= config.minRetrievalScore);
+  const passages = logistics ? [] : (await (searchEarly ?? deps.search(text))).filter((p) => p.score >= config.minRetrievalScore);
   res.topScore = passages[0]?.score;
   const used: Passage[] = [...passages];
   const notes = [c.caller.zip ? `The caller's ZIP code is ${c.caller.zip}.` : "", c.verified ? `The caller is verified as ${c.verified.firstName}.` : "",
@@ -316,6 +339,19 @@ export function isSelfNote(p: string): boolean {
 
 // Short replies to the assistant's own questions: a ZIP, a phone number and ZIP, a slot pick from the buttons, or a name.
 const LOGISTICS = [/^\s*(my zip( code)? is\s*)?\d{5}\.?\s*$/i, /^[\s\d().,+-]*\d{3}[\s().-]*\d{3}[\s.-]*\d{4}\b[\s,.]*(and\s+)?(zip( code)?:?\s*)?(\d{5})?\.?\s*$|^(my )?(phone( number)?|number) is [\d\s().-]{10,16}(,? and (my )?zip( code)? is \d{5})?\.?$/i, /^I'll take .+ \(slot_id \d+\)\.$/, /^\s*(it'?s|my name is|i'?m|name'?s)?\s*[A-Z][a-z'-]+( [A-Z][a-z'-]+){0,2}\.?\s*$/];
+// A bare ZIP, phone number or slot button carries no words the safety classifier could read.
+const isData = (text: string) => text.length <= 80 && LOGISTICS.slice(0, 3).some((r) => r.test(text));
+
+function lastAssistantText(c: Conversation): string | undefined {
+  for (let i = c.messages.length - 1; i >= 0; i--) {
+    const m = c.messages[i];
+    if (m.role !== "assistant") continue;
+    if (typeof m.content === "string") return m.content;
+    const t = m.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join(" ");
+    if (t) return t;
+  }
+}
+
 export function isLogistics(text: string): boolean {
   return text.length <= 80 && LOGISTICS.some((r) => r.test(text));
 }
