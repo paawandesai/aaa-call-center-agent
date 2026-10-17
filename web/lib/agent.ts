@@ -194,8 +194,11 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     return { ...res, outcome: "safety", handoffReason: "safety", intent: "self_harm" };
   }
   if (r.kind === "deflect") {
-    emit({ type: "text_delta", text: SCRIPTS[r.script] });
-    await scripted(SCRIPTS[r.script], null, r.intent);
+    // An injection attempt in the middle of a booking doesn't drop the booking: the caller is asked for a plain name.
+    const reply = r.script === "injection" && c.offered.size && !c.safetyLock
+      ? `${SCRIPTS.injection} If you'd still like the visit you picked, just tell me the name to book it under.` : SCRIPTS[r.script];
+    emit({ type: "text_delta", text: reply });
+    await scripted(reply, null, r.intent);
     return { ...res, outcome: "deflected", intent: r.intent };
   }
 

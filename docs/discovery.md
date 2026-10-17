@@ -87,5 +87,5 @@ Still escalated: payments, disputes, refunds, autopay, membership cancellations,
 
 The ceiling was recomputed on the labelled eval sets rather than this table: 69 of the 100 held-out September calls may be handled (was 48 under the old scope), and 84 of the 130 dev calls. The README's Results section has the run-by-run numbers.
 
-The k-means cluster sizes are not reported here; the clusters were only used to write the labelling rules, and the counts above are rule labels over the 318 de-duplicated calls.
+The k-means clusters (k = 15, over the 318 de-duplicated calls) had 63, 47, 35, 25, 22, 21, 18, 14, 13, 11, 11, 11, 10, 9 and 8 calls. They were only used to write the labelling rules; the driver counts above are rule labels.
 

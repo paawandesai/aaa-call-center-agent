@@ -42,8 +42,13 @@ REQUIRED = {
 }
 # Values from superseded documents. Seeing one in an answer fails the case.
 FORBIDDEN = [r"\$79\b", r"\$12\.99", r"\$219", r"90[- ]day (labor |repair )?warranty", r"48[- ]hours?", r"10% off",
-             r"1[- ]year (labor )?(install|installation)"]
-FORBIDDEN_MEMBERSHIP = [r"\$149 (per|a|each) year", r"\$149/y"]
+             r"1[- ]year (labor )?(install|installation)",
+             # Old FAQ phone hours and payment rule (faq_old_copy.md), added after the 2026-10-17 audit.
+             r"8(:00)? ?(am|a\.m\.)\s*(-|–|to)\s*6(:00)? ?(pm|p\.m\.)", r"9(:00)? ?(am|a\.m\.)\s*(-|–|to)\s*1(:00)? ?(pm|p\.m\.)",
+             r"(?<!not )(?<!don't )(?<!do not )\b(checks? (are )?accepted|accept (personal )?checks)"]
+FORBIDDEN_MEMBERSHIP = [r"\$149 (per|a|each) year", r"\$149/y",
+                        # Archived membership overview: refund and transfer terms the 2026 document replaced.
+                        r"(?<!no )prorated refund", r"\b(membership|it) (transfers?|moves?|goes) with (you|the homeowner|the owner)\b"]
 PLUMBING = r"(?i)sink|drain|water heater|leak|pipe|toilet|faucet|backing up|plumb"
 ZIPS = ["78745", "78664", "78640"]  # one per zone (central, north, south), picked by case id
 
