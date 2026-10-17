@@ -10,6 +10,8 @@ export type Route =
   | { kind: "deflect"; script: "injection" | "ai_disclosure"; intent: string }
   | { kind: "model" };
 
+import { zipLookup } from "./zones";
+
 const t = (s: string) => new RegExp(s, "i");
 
 const SAFETY: [RegExp, Route & { kind: "safety" }][] = [
@@ -23,8 +25,8 @@ const SAFETY: [RegExp, Route & { kind: "safety" }][] = [
 const HANDOFF: [RegExp, HandoffReason, string][] = [
   [t(String.raw`\b(talk|speak|chat)\s+(to|with)\s+(a\s+|an\s+)?(real\s+|live\s+|actual\s+)?(person|human|agent|rep|representative|someone|somebody|operator|manager|supervisor)|\b(want|need|get|give)\s+(me\s+)?(a\s+)?(real|live)\s+(person|human)\b|\bhuman,? please\b|^\s*(agent|representative|operator)\s*$`), "human_requested", "human_requested"],
   [t(String.raw`\b(cancel|reschedul|re-schedul|move|push back|change)\w*\b.{0,40}\b(appointment|visit|booking|tech(nician)? visit)|\bcancel (it|my)|\breschedule\b`), "cancel_reschedule", "cancel_reschedule"],
-  [t(String.raw`\b(my|the|this|an?)\s+(bill|invoice|statement|charge|balance)\b|\b(refund|overcharg|double[- ]charg|charged (me|twice)|dispute|payment plan|pay (my|the|an?) (bill|invoice|balance)|past due|collections|card on file|autopay)\b`), "billing_account", "billing"],
-  [t(String.raw`\b(my|our)\s+(account|membership (status|renewal date)|renewal date)\b|\bwhen does my membership\b|\bam i (a member|on the plan|covered)\b|\bupdate my (address|phone|email|card)\b`), "billing_account", "account_lookup"],
+  [t(String.raw`\b(my|the|this|an?)\s+(bill|invoice|statement|charge|balance)\b|\b(refund|overcharg|double[- ]charg|charged (me|twice)|dispute|payment plan|pay (my |the |an? )?(bill|invoice|balance)|past due|collections|card on file|autopay)\b`), "billing_account", "billing"],
+  [t(String.raw`\b(my|our)\s+(account|membership (status|renewal date)|renewal date)\b|\bwhen does my membership\b|\bam i (a member|on the plan|covered)\b|\bupdate my (address|phone|email|card)\b|\b(did|have|has) (you|y'all|you guys|anyone|meridian) (\w+ )?register|\b(unit|system|equipment) (is |was |got )?registered\b`), "billing_account", "account_lookup"],
   [t(String.raw`\b(when|what time) (is|will) (my|the) (tech|technician|appointment)|\b(where is|eta for) (my|the) (tech|technician)|\bconfirm my (appointment|visit)|\bdo i have an appointment\b`), "out_of_scope", "existing_appointment"],
   [t(String.raw`\b(complain|complaint|terrible|awful|horrible|unacceptable|furious|ripped off|scam|lawsuit|lawyer|attorney|bbb|better business bureau|damaged my|broke my|rude)\b`), "complaint", "complaint"],
 ];
@@ -35,6 +37,8 @@ const INJECTION = t(String.raw`\b(ignore (all |any )?(previous|prior|above) (ins
 export function route(text: string): Route {
   for (const [re, r] of SAFETY) if (re.test(text)) return r;
   for (const [re, reason, intent] of HANDOFF) if (re.test(text)) return { kind: "handoff", reason, intent };
+  // A ZIP the service-area documents disagree on goes to a person whatever the caller asks, as check_availability would.
+  for (const m of text.matchAll(/\b\d{5}\b/g)) if (zipLookup(m[0]).kind === "unclear") return { kind: "handoff", reason: "service_area_unclear", intent: "service_area" };
   if (INJECTION.test(text)) return { kind: "deflect", script: "injection", intent: "adversarial" };
   if (ARE_YOU_HUMAN.test(text) && text.length < 160) return { kind: "deflect", script: "ai_disclosure", intent: "ai_disclosure" };
   return { kind: "model" };

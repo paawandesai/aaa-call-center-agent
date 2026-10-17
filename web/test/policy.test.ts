@@ -19,6 +19,13 @@ describe("deterministic routing", () => {
     ["I want a real person", "handoff"],
     ["my AC is blowing warm air, can someone come out?", "model"],
     ["does the warranty transfer if I sell my house?", "model"],
+    ["I need to pay invoice [INVOICE_ID]. Can I do it over the phone?", "handoff"],
+    ["Did you guys register my new unit with the manufacturer? I never got anything.", "handoff"],
+    ["how do I register my warranty?", "model"],
+    ["how do I register my new unit with the manufacturer?", "model"],
+    ["is my system registered?", "handoff"],
+    ["I'm in Lakeway, ZIP 78734. Can you book a tune-up next week?", "handoff"],
+    ["My water heater is leaking. ZIP 78745.", "model"],
   ])("%s -> %s", (text, kind) => expect(route(text).kind).toBe(kind));
 
   it("does not treat safety as bookable even when the caller also asks to book", () => {

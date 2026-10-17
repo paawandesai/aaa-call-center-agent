@@ -1,32 +1,37 @@
 {
- "run_id": "20261016T2359-6132",
- "created_at": "2026-10-16T23:59:18.901Z",
- "config_id": "33a1a46fcd",
- "prompt_version": "agent-v2",
+ "run_id": "20261017T1639-27cc",
+ "created_at": "2026-10-17T16:39:04.712Z",
+ "config_id": "c55f6244bb",
+ "prompt_version": "agent-v3",
+ "split": "holdout",
  "demo_now": "2026-10-16T15:00:00Z",
  "tokens": {
-  "input": 1282838,
-  "output": 35798,
-  "est_cost_usd": 5.85
+  "input": 1275728,
+  "output": 43427,
+  "uncached_input": 1108,
+  "cache_read": 1198268,
+  "cache_write": 76352,
+  "est_cost_usd": 0.04,
+  "est_cost_per_case_usd": 0.0003
  },
  "holdout": {
   "n": 100,
   "containment": {
-   "k": 37,
+   "k": 45,
    "n": 100,
-   "rate": 0.37,
+   "rate": 0.45,
    "ci": [
-    0.28182212569509163,
-    0.46779652424866885
+    0.3561437510640346,
+    0.5475557296835656
    ]
   },
   "contained_any": {
-   "k": 38,
+   "k": 50,
    "n": 100,
-   "rate": 0.38,
+   "rate": 0.5,
    "ci": [
-    0.2909744920013438,
-    0.47790426179289663
+    0.40382982859014716,
+    0.5961701714098528
    ]
   },
   "ceiling": {
@@ -39,31 +44,31 @@
    ]
   },
   "accuracy": {
-   "k": 37,
+   "k": 45,
    "n": 48,
-   "rate": 0.7708333333333334,
+   "rate": 0.9375,
    "ci": [
-    0.6346046409154885,
-    0.8669230897101096
+    0.8316430233725778,
+    0.9785171568687727
    ]
   },
   "escalation": {
    "precision": {
-    "k": 52,
-    "n": 62,
-    "rate": 0.8387096774193549,
+    "k": 50,
+    "n": 50,
+    "rate": 1,
     "ci": [
-     0.7279343069043936,
-     0.9099602764593157
+     0.9286499658256813,
+     1
     ]
    },
    "recall": {
-    "k": 52,
+    "k": 50,
     "n": 52,
-    "rate": 1,
+    "rate": 0.9615384615384616,
     "ci": [
-     0.9312054095871178,
-     1
+     0.8701857125563401,
+     0.9893885116779224
     ]
    }
   },
@@ -81,8 +86,10 @@
     "driver": "Billing and payments",
     "n": 21,
     "contained": 0,
-    "correct": 21,
-    "failed": []
+    "correct": 20,
+    "failed": [
+     "a7bf473de7"
+    ]
    },
    {
     "driver": "Complaint / escalation request",
@@ -101,15 +108,9 @@
    {
     "driver": "Membership (Comfort Club)",
     "n": 12,
-    "contained": 4,
-    "correct": 7,
-    "failed": [
-     "0db8d78778",
-     "48444dd5e7",
-     "51896daade",
-     "b517d681b1",
-     "e77b269ab1"
-    ]
+    "contained": 9,
+    "correct": 12,
+    "failed": []
    },
    {
     "driver": "Other (redirect)",
@@ -124,7 +125,7 @@
     "contained": 30,
     "correct": 34,
     "failed": [
-     "c7540d0a75"
+     "daed482506"
     ]
    },
    {
@@ -138,45 +139,26 @@
     "driver": "System replacement estimate",
     "n": 2,
     "contained": 0,
-    "correct": 2,
-    "failed": []
+    "correct": 1,
+    "failed": [
+     "6cdd8b914b"
+    ]
    },
    {
     "driver": "Warranty",
     "n": 6,
-    "contained": 0,
-    "correct": 1,
+    "contained": 3,
+    "correct": 4,
     "failed": [
-     "177564de93",
      "6ab24c93d7",
-     "b8c33841fe",
-     "cb088b9ecb",
-     "fa7175f3da"
+     "cb088b9ecb"
     ]
    }
   ],
   "failures": [
    {
-    "id": "0db8d78778",
-    "driver": "Membership (Comfort Club)",
-    "expected": "answered",
-    "got": "handoff:billing_account",
-    "checks": [
-     "expected an answer, got handoff (billing_account)"
-    ]
-   },
-   {
-    "id": "177564de93",
+    "id": "6ab24c93d7",
     "driver": "Warranty",
-    "expected": "booked",
-    "got": "handoff:billing_account",
-    "checks": [
-     "expected a booking, got handoff (billing_account)"
-    ]
-   },
-   {
-    "id": "48444dd5e7",
-    "driver": "Membership (Comfort Club)",
     "expected": "answered",
     "got": "booked",
     "checks": [
@@ -184,75 +166,39 @@
     ]
    },
    {
-    "id": "51896daade",
-    "driver": "Membership (Comfort Club)",
-    "expected": "answered",
-    "got": "handoff:billing_account",
+    "id": "6cdd8b914b",
+    "driver": "System replacement estimate",
+    "expected": "handoff",
+    "got": "answered",
     "checks": [
-     "expected an answer, got handoff (billing_account)"
+     "expected a handoff, got answered"
     ]
    },
    {
-    "id": "6ab24c93d7",
-    "driver": "Warranty",
-    "expected": "answered",
-    "got": "handoff:billing_account",
+    "id": "a7bf473de7",
+    "driver": "Billing and payments",
+    "expected": "handoff",
+    "got": "answered",
     "checks": [
-     "expected an answer, got handoff (billing_account)"
-    ]
-   },
-   {
-    "id": "b517d681b1",
-    "driver": "Membership (Comfort Club)",
-    "expected": "answered",
-    "got": "handoff:billing_account",
-    "checks": [
-     "expected an answer, got handoff (billing_account)"
-    ]
-   },
-   {
-    "id": "b8c33841fe",
-    "driver": "Warranty",
-    "expected": "booked",
-    "got": "handoff:billing_account",
-    "checks": [
-     "expected a booking, got handoff (billing_account)"
-    ]
-   },
-   {
-    "id": "c7540d0a75",
-    "driver": "Repair / service booking",
-    "expected": "booked",
-    "got": "handoff:low_confidence",
-    "checks": [
-     "expected a booking, got handoff (low_confidence)"
+     "expected a handoff, got answered"
     ]
    },
    {
     "id": "cb088b9ecb",
     "driver": "Warranty",
     "expected": "answered",
-    "got": "handoff:billing_account",
+    "got": "booked",
     "checks": [
-     "expected an answer, got handoff (billing_account)"
+     "expected an answer, got booked"
     ]
    },
    {
-    "id": "e77b269ab1",
-    "driver": "Membership (Comfort Club)",
-    "expected": "answered",
-    "got": "handoff:booking_failed",
-    "checks": [
-     "expected an answer, got handoff (booking_failed)"
-    ]
-   },
-   {
-    "id": "fa7175f3da",
-    "driver": "Warranty",
+    "id": "daed482506",
+    "driver": "Repair / service booking",
     "expected": "booked",
-    "got": "handoff:billing_account",
+    "got": "booked",
     "checks": [
-     "expected a booking, got handoff (billing_account)"
+     "booked wrong service (Plumbing visit)"
     ]
    }
   ]
@@ -268,12 +214,12 @@
    ]
   },
   "probes": {
-   "k": 5,
+   "k": 6,
    "n": 6,
-   "rate": 0.8333333333333334,
+   "rate": 1,
    "ci": [
-    0.43649056343635395,
-    0.9699474141282697
+    0.6096569663469354,
+    0.9999999999999999
    ]
   },
   "cases": [
@@ -308,7 +254,7 @@
    {
     "id": "adv-05-other-bookings",
     "pass": true,
-    "outcome": "handoff:cancel_reschedule",
+    "outcome": "answered",
     "checks": [],
     "probe": false
    },
@@ -433,11 +379,9 @@
    },
    {
     "id": "probe-05-hours",
-    "pass": false,
-    "outcome": "handoff:low_confidence",
-    "checks": [
-     "missing /8\\s?(am|a\\.m\\.|:00)/"
-    ],
+    "pass": true,
+    "outcome": "answered",
+    "checks": [],
     "probe": true
    },
    {
@@ -461,6 +405,5 @@
   },
   "mrr": 0.8347222222222223,
   "where": "app query on pgvector (PGlite), dev set"
- },
- "prompt_version_note": "Runner printed agent-v1 because the version constant was bumped after this run started; config_id 33a1a46fcd hashes the v2 prompt that ran."
+ }
 }

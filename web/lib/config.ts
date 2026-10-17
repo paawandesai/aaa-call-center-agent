@@ -1,8 +1,8 @@
 // Model ids and limits live here (and in env), never in prompts or docs.
 export const config = {
-  model: process.env.AGENT_MODEL ?? "claude-opus-5-5",
+  model: process.env.AGENT_MODEL ?? "claude-haiku-5-5",
   // Server-side fallback is offered for Opus and Sonnet, not Haiku.
-  serverFallback: !/haiku/.test(process.env.AGENT_MODEL ?? "claude-opus-5-5"),
+  serverFallback: !/haiku/.test(process.env.AGENT_MODEL ?? "claude-haiku-5-5"),
   effort: (process.env.AGENT_EFFORT ?? "low") as "low" | "medium" | "high",
   maxTokens: Number(process.env.AGENT_MAX_TOKENS ?? 1024),
   maxToolRounds: 4,
