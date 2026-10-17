@@ -11,13 +11,15 @@ import { SYSTEM_PROMPT, turnData } from "./prompt";
 import type { Passage } from "./retrieval";
 import { FEE_LABEL, findSlots, isSlotAvailable, SERVICE_LABEL, whenLabel, type ServiceType, type Slot } from "./scheduling";
 import { zipLookup } from "./zones";
+import { lateFee, lookupAccount, upcomingAppointments, verifyCaller } from "./accounts";
+import { allow } from "./ratelimit";
 
 type Tool = Anthropic.Beta.BetaTool;
 const SERVICE_TYPES = ["hvac_repair", "hvac_tune_up", "plumbing", "estimate"] as const;
 const MODEL_HANDOFF_REASONS = ["safety", "billing_account", "cancel_reschedule", "complaint", "human_requested",
   "low_confidence", "service_area_unclear", "booking_failed", "out_of_scope"] as const;
 
-// Narrow, read-only tools. None of them writes a booking: propose_booking only shows a confirm card.
+// Narrow tools. None of them writes: propose_booking and propose_appointment_change only show a card the caller confirms.
 export const TOOLS: Tool[] = [
   {
     name: "search_kb",
@@ -27,7 +29,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "check_availability",
-    description: "Find up to 4 open appointment times for a new visit. The app shows them to the caller as buttons.",
+    description: "Find up to 4 open appointment times for a new visit, or a new time for an existing appointment. The app shows them to the caller as buttons.",
     strict: true,
     input_schema: {
       type: "object",
@@ -57,6 +59,33 @@ export const TOOLS: Tool[] = [
     },
   },
   {
+    name: "verify_caller",
+    description: "Verify the caller before any account question or appointment change, using the phone number on their account and the ZIP code of the service address. Both must match one customer.",
+    strict: true,
+    input_schema: { type: "object", properties: { phone: { type: "string" }, zip: { type: "string" } }, required: ["phone", "zip"], additionalProperties: false },
+  },
+  {
+    name: "lookup_account",
+    description: "Read the verified caller's own records: upcoming appointments, invoices and balance, or membership and renewal date. Only works after verify_caller succeeds.",
+    strict: true,
+    input_schema: { type: "object", properties: { topic: { type: "string", enum: ["appointments", "invoices", "membership"] } }, required: ["topic"], additionalProperties: false },
+  },
+  {
+    name: "propose_appointment_change",
+    description: "Show the verified caller a confirmation card to cancel one of their upcoming appointments, or move it to a time returned by check_availability. Nothing changes until the caller presses Confirm.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: {
+        appointment_id: { type: "integer", description: "From lookup_account" },
+        action: { type: "string", enum: ["cancel", "reschedule"] },
+        new_slot_id: { type: "integer", description: "For reschedule, a slot_id from check_availability; 0 for cancel" },
+      },
+      required: ["appointment_id", "action", "new_slot_id"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "handoff",
     description: "Pass the conversation to a person on Meridian's team, with a short summary so the caller doesn't have to repeat themselves.",
     strict: true,
@@ -76,6 +105,9 @@ const SearchIn = z.object({ query: z.string().min(1).max(300) });
 const AvailIn = z.object({ service_type: z.enum(SERVICE_TYPES), zip: z.string().max(10), on_or_after: z.string().max(10),
   part_of_day: z.enum(["morning", "afternoon", "evening", "any"]) });
 const ProposeIn = z.object({ slot_id: z.number().int(), caller_name: z.string().min(1).max(60), issue_summary: z.string().max(200) });
+const VerifyIn = z.object({ phone: z.string().max(30), zip: z.string().max(10) });
+const LookupIn = z.object({ topic: z.enum(["appointments", "invoices", "membership"]) });
+const ChangeIn = z.object({ appointment_id: z.number().int(), action: z.enum(["cancel", "reschedule"]), new_slot_id: z.number().int() });
 const HandoffIn = z.object({ reason: z.enum(MODEL_HANDOFF_REASONS), summary: z.string().min(1).max(600) });
 
 export interface Deps {
@@ -85,7 +117,7 @@ export interface Deps {
 }
 
 export interface TurnResult {
-  outcome: "answered" | "slots_offered" | "confirm_shown" | "handoff" | "safety" | "deflected" | "error";
+  outcome: "answered" | "slots_offered" | "confirm_shown" | "change_shown" | "handoff" | "safety" | "deflected" | "error";
   handoffReason?: HandoffReason;
   intent?: string;
   inputTokens: number; // all input, cached or not
@@ -109,6 +141,8 @@ const INTENT_SUMMARY: Record<string, string> = {
   account_lookup: "You have a question that needs your account records.",
   existing_appointment: "You want details about an existing appointment.",
   complaint: "You have a concern about a past visit or our service.",
+  membership_cancel: "You want to cancel your Comfort Club membership.",
+  tech_late: "Your technician hasn't arrived and you want an update.",
 };
 
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: config.tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(now());
@@ -156,7 +190,8 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
   const passages = logistics ? [] : (await deps.search(text)).filter((p) => p.score >= config.minRetrievalScore);
   res.topScore = passages[0]?.score;
   const used: Passage[] = [...passages];
-  const notes = [c.caller.zip ? `The caller's ZIP code is ${c.caller.zip}.` : "", ...c.notes.splice(0)].filter(Boolean);
+  const notes = [c.caller.zip ? `The caller's ZIP code is ${c.caller.zip}.` : "", c.verified ? `The caller is verified as ${c.verified.firstName}.` : "",
+    ...c.notes.splice(0)].filter(Boolean);
   const extra = notes.length ? notes.join(" ") : undefined;
   const base = c.messages.length;
   c.messages.push({ role: "user", content: turnData(today(), passages, text, extra) });
@@ -236,7 +271,8 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     return { ...res, outcome: "error" };
   }
 
-  if (res.outcome === "answered" && !sawUiCard) {
+  // Account answers come from the caller's records, not the knowledge base, so they carry no source chips.
+  if (res.outcome === "answered" && !sawUiCard && !res.toolCalls.some((t) => t === "lookup_account" || t === "verify_caller")) {
     const seen = new Set<string>();
     const sources = [];
     // Show a passage as a source only if the answer visibly uses it (shared amounts or content words).
@@ -256,8 +292,8 @@ export function isSelfNote(p: string): boolean {
   return p.length <= 120 && !/\b(I|I'm|I'll|I've|you|your|you're|we|we're|our|Meridian|sorry|thanks|hi|hello)\b/i.test(p);
 }
 
-// Short replies to the assistant's booking questions: a ZIP, a slot pick from the buttons, or a name.
-const LOGISTICS = [/^\s*(my zip( code)? is\s*)?\d{5}\.?\s*$/i, /^I'll take .+ \(slot_id \d+\)\.$/, /^\s*(it'?s|my name is|i'?m|name'?s)?\s*[A-Z][a-z'-]+( [A-Z][a-z'-]+){0,2}\.?\s*$/];
+// Short replies to the assistant's own questions: a ZIP, a phone number and ZIP, a slot pick from the buttons, or a name.
+const LOGISTICS = [/^\s*(my zip( code)? is\s*)?\d{5}\.?\s*$/i, /^[\s\d().,+-]*\d{3}[\s().-]*\d{3}[\s.-]*\d{4}\b[\s,.]*(and\s+)?(zip( code)?:?\s*)?(\d{5})?\.?\s*$|^(my )?(phone( number)?|number) is [\d\s().-]{10,16}(,? and (my )?zip( code)? is \d{5})?\.?$/i, /^I'll take .+ \(slot_id \d+\)\.$/, /^\s*(it'?s|my name is|i'?m|name'?s)?\s*[A-Z][a-z'-]+( [A-Z][a-z'-]+){0,2}\.?\s*$/];
 export function isLogistics(text: string): boolean {
   return text.length <= 80 && LOGISTICS.some((r) => r.test(text));
 }
@@ -352,6 +388,55 @@ async function runTool(
         zip: o.zip, name: c.caller.name, fee_label: FEE_LABEL[o.service_type] });
       res.outcome = "confirm_shown";
       return { content: JSON.stringify({ result: "confirm_card_shown", note: "Not booked yet. The caller must press Confirm." }), card: true };
+    }
+    case "verify_caller": {
+      const p = VerifyIn.safeParse(u.input);
+      if (!p.success) return bad("INVALID_INPUT");
+      if (c.verified) return { content: JSON.stringify({ result: "already_verified", first_name: c.verified.firstName }) };
+      // Three tries per conversation and ten per session per hour, so the tool can't be used to search for accounts.
+      if (c.verifyAttempts >= 3 || !allow(`verify:${c.sessionId}`, 10, 3_600_000).ok)
+        return { content: JSON.stringify({ result: "locked", note: "Too many attempts. Offer to pass the caller to a person (handoff reason out_of_scope)." }) };
+      c.verifyAttempts++;
+      const v = await verifyCaller(deps.db, p.data.phone, p.data.zip);
+      if (!v) return { content: JSON.stringify({ result: "no_match", attempts_left: 3 - c.verifyAttempts, note: "Don't say which part didn't match." }) };
+      const z = zipLookup(v.zip);
+      c.verified = { ...v, zone: z.kind === "zone" ? z.zone : null };
+      c.caller.zip = v.zip;
+      c.caller.name = v.firstName;
+      return { content: JSON.stringify({ result: "verified", first_name: v.firstName, zip: v.zip }) };
+    }
+    case "lookup_account": {
+      const p = LookupIn.safeParse(u.input);
+      if (!p.success) return bad("INVALID_INPUT");
+      if (!c.verified) return bad("Not verified. Ask for the phone number on the account and the service ZIP code, then call verify_caller.");
+      return { content: JSON.stringify(await lookupAccount(deps.db, c.verified.customerId, p.data.topic)) };
+    }
+    case "propose_appointment_change": {
+      const p = ChangeIn.safeParse(u.input);
+      if (!p.success) return bad("INVALID_INPUT");
+      if (!c.verified) return bad("Not verified. Call verify_caller first.");
+      if (c.safetyLock) return bad("Appointment changes are not available in this conversation because of a safety concern.");
+      const appt = (await upcomingAppointments(deps.db, c.verified.customerId)).find((a) => a.appointment_id === p.data.appointment_id);
+      if (!appt) return bad("That appointment_id is not one of this caller's upcoming appointments. Call lookup_account first.");
+      let newWhen: string | undefined;
+      if (p.data.action === "reschedule") {
+        const o = c.offered.get(p.data.new_slot_id);
+        if (!o) return bad("That new_slot_id was not offered in this conversation. Call check_availability first, with the appointment's service_type and the caller's ZIP.");
+        // Zone comes from the caller's ZIP (check_availability), not the old slot: the mock data's slot zones don't follow customer addresses.
+        if (o.service_type !== appt.service_type) return bad(`The new time must be for the same service_type as the appointment (${appt.service_type}). Call check_availability again with service_type ${appt.service_type}.`);
+        const still = await isSlotAvailable(deps.db, o.slot_id, o.zone, o.service_type);
+        if (!still) return { content: JSON.stringify({ result: "slot_taken", note: "Call check_availability again." }) };
+        newWhen = whenLabel(o.date, o.window);
+      }
+      c.pendingChange = { session_id: c.sessionId, customer_id: c.verified.customerId, appointment_id: appt.appointment_id, action: p.data.action,
+        new_slot_id: p.data.action === "reschedule" ? p.data.new_slot_id : undefined, service_type: appt.service_type,
+        zone: p.data.action === "reschedule" ? c.offered.get(p.data.new_slot_id)!.zone : appt.zone };
+      const fee = lateFee(appt.start_utc);
+      emit({ type: "change_request", action: p.data.action, appointment_id: appt.appointment_id, service: SERVICE_LABEL[appt.service_type],
+        current_when: whenLabel(appt.date, appt.window), new_when: newWhen, new_slot_id: p.data.action === "reschedule" ? p.data.new_slot_id : undefined,
+        fee_label: fee ?? "No fee (more than 24 hours before the window)" });
+      res.outcome = "change_shown";
+      return { content: JSON.stringify({ result: "confirm_card_shown", late_fee: fee, note: "Nothing has changed yet. The caller must press Confirm." }), card: true };
     }
     case "handoff": {
       const p = HandoffIn.safeParse(u.input);

@@ -466,28 +466,28 @@
 "driver": "Existing appointment",
 "intent": "appt_confirm",
 "zip": "78640",
-"expected": "handoff"
+"expected": "answered"
 },
 {
 "id": "08e54bf362",
 "driver": "Existing appointment",
 "intent": "appt_confirm",
 "zip": "78640",
-"expected": "handoff"
+"expected": "answered"
 },
 {
 "id": "0e2641db70",
 "driver": "Existing appointment",
 "intent": "appt_reschedule",
 "zip": "78745",
-"expected": "handoff"
+"expected": "changed"
 },
 {
 "id": "14a86b35d1",
 "driver": "Existing appointment",
 "intent": "appt_confirm",
 "zip": "78664",
-"expected": "handoff"
+"expected": "answered"
 },
 {
 "id": "37b400b3a9",
@@ -501,14 +501,14 @@
 "driver": "Existing appointment",
 "intent": "appt_reschedule",
 "zip": "78745",
-"expected": "handoff"
+"expected": "changed"
 },
 {
 "id": "40ea109725",
 "driver": "Existing appointment",
 "intent": "appt_reschedule",
 "zip": "78640",
-"expected": "handoff"
+"expected": "changed"
 },
 {
 "id": "5c0ce8a612",
@@ -698,5 +698,215 @@
 "intent": "job_inquiry",
 "zip": "78745",
 "expected": "handoff"
+},
+{
+"id": "7759920def",
+"driver": "Existing appointment",
+"intent": "appt_cancel",
+"zip": "78664",
+"expected": "changed"
+},
+{
+"id": "9b3dfb3ff6",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "d7ebc2b207",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "ebceb2e898",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "cdd65483bc",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78745",
+"expected": "changed"
+},
+{
+"id": "cac371729a",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "acd4ac0da6",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "cf31c15725",
+"driver": "Existing appointment",
+"intent": "appt_cancel",
+"zip": "78640",
+"expected": "changed"
+},
+{
+"id": "cf47fd2fdc",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78640",
+"expected": "changed"
+},
+{
+"id": "9ca7a58f74",
+"driver": "Existing appointment",
+"intent": "appt_cancel",
+"zip": "78640",
+"expected": "changed"
+},
+{
+"id": "5f707a997f",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "fc955aed74",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "625da21a38",
+"driver": "Existing appointment",
+"intent": "appt_confirm",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "e25b123d59",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "d75c829774",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78664",
+"expected": "changed"
+},
+{
+"id": "670b0ebf96",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "b853d60f28",
+"driver": "Existing appointment",
+"intent": "appt_confirm",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "a5fd2b3636",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "c706aaf5bd",
+"driver": "Existing appointment",
+"intent": "appt_confirm",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "58f9827181",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "f752f49a49",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "80c51d930e",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78664",
+"expected": "answered"
+},
+{
+"id": "b92d061324",
+"driver": "Billing and payments",
+"intent": "balance_inquiry",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "8689beecbd",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "da3efed987",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78640",
+"expected": "answered"
+},
+{
+"id": "9751ee8240",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78745",
+"expected": "answered"
+},
+{
+"id": "cd903de2c5",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78664",
+"expected": "changed"
+},
+{
+"id": "5eb15ef4e5",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78664",
+"expected": "changed"
+},
+{
+"id": "f54a636630",
+"driver": "Existing appointment",
+"intent": "appt_reschedule",
+"zip": "78640",
+"expected": "changed"
+},
+{
+"id": "9c7c0971ee",
+"driver": "Billing and payments",
+"intent": "invoice_question",
+"zip": "78745",
+"expected": "answered"
 }
 ]

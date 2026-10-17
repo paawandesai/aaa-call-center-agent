@@ -10,21 +10,27 @@ type Item =
   | { id: string; kind: "slots"; slots: SlotT[]; picked?: number; used: boolean; note?: string }
   | { id: string; kind: "confirm"; data: Omit<Extract<AgentEvent, { type: "confirm_request" }>, "type">; state: "open" | "sending" | "closed"; key: string }
   | { id: string; kind: "booked"; data: Omit<Extract<AgentEvent, { type: "booked" }>, "type"> }
+  | { id: string; kind: "change"; data: Omit<Extract<AgentEvent, { type: "change_request" }>, "type">; state: "open" | "sending" | "closed"; key: string }
+  | { id: string; kind: "changed"; data: Omit<Extract<AgentEvent, { type: "changed" }>, "type"> }
   | { id: string; kind: "handoff"; data: Omit<Extract<AgentEvent, { type: "handoff" }>, "type"> }
   | { id: string; kind: "safety"; text: string }
   | { id: string; kind: "error"; code: string; retry?: () => void };
 
 const rid = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
-const GREETING = "Hi, this is Meridian's automated assistant. I'm an AI, not a person. I can answer questions about fees, hours, membership and warranties, and book a repair, tune-up or estimate. You can ask for a person at any time.";
+const GREETING = "Hi, this is Meridian's automated assistant. I'm an AI, not a person. I can answer questions about fees, hours, membership and warranties, book a repair, tune-up or estimate, and once you're verified, check or change your appointments and invoices. You can ask for a person at any time.";
 
 const ERRORS: Record<string, string> = {
   rate_limited: "You're sending messages quickly. Wait a moment and try again.",
   capacity: "The demo has reached its daily usage limit. Please try again tomorrow, or ask for a person.",
   duplicate_turn: "That message was already handled.",
+  change_slot_taken: "That new time was just taken. Ask me for other times.",
+  change_error: "I couldn't make that change. Ask for a person and they'll take care of it.",
   turn_in_progress: "I'm still answering your last message.",
 };
 
-export function Chat({ role = "caller" }: { role?: "caller" | "staff" }) {
+export interface DemoIdentity { first_name: string; phone: string; zip: string; has: string }
+
+export function Chat({ role = "caller", demoIds = [] }: { role?: "caller" | "staff"; demoIds?: DemoIdentity[] }) {
   const [items, setItems] = useState<Item[]>([{ id: "greet", kind: "assistant", text: GREETING, turnId: "greeting" }]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -100,6 +106,12 @@ export function Chat({ role = "caller" }: { role?: "caller" | "staff" }) {
                 { id: rid(), kind: "confirm", data, state: "open", key: rid() }]);
               break;
             }
+            case "change_request": {
+              const { type: _t, ...data } = ev;
+              setItems((xs) => [...xs.map((x) => (x.kind === "change" && x.state === "open" ? { ...x, state: "closed" as const } : x)),
+                { id: rid(), kind: "change", data, state: "open", key: rid() }]);
+              break;
+            }
             case "booking_failed":
               setItems((xs) => [...xs, { id: rid(), kind: "slots", slots: ev.slots, used: false, note: "That time was just taken. Here are the next openings." }]);
               break;
@@ -117,6 +129,7 @@ export function Chat({ role = "caller" }: { role?: "caller" | "staff" }) {
                 retry: ev.retryable ? () => void run(body, null, turnId) : undefined }]);
               break;
             case "booked":
+            case "changed":
             case "done":
               break;
           }
@@ -163,6 +176,25 @@ export function Chat({ role = "caller" }: { role?: "caller" | "staff" }) {
     }
   }
 
+  async function confirmChange(item: Extract<Item, { kind: "change" }>) {
+    patch(item.id, (x) => ({ ...x, state: "sending" }) as Item);
+    const r = await fetch("/api/appointments/change", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation_id: conversationId, appointment_id: item.data.appointment_id, action: item.data.action, idempotency_key: item.key }) });
+    const j = await r.json().catch(() => ({ type: "change_failed", reason: "error" }));
+    patch(item.id, (x) => ({ ...x, state: "closed" }) as Item);
+    if (j.type === "changed") {
+      setItems((xs) => [...xs, { id: rid(), kind: "changed", data: j }]);
+      setLive(j.action === "cancel" ? `Cancelled. ${j.service}, ${j.old_when_label}.` : `Moved. ${j.service}, now ${j.when_label}.`);
+      setTimeout(() => bookedHeading.current?.focus(), 50);
+    } else if (j.reason === "slot_taken") {
+      setItems((xs) => [...xs, { id: rid(), kind: "error", code: "change_slot_taken" }]);
+    } else if (j.reason === "cap_reached") {
+      setItems((xs) => [...xs, { id: rid(), kind: "error", code: "cap_reached" }]);
+    } else {
+      setItems((xs) => [...xs, { id: rid(), kind: "error", code: "change_error" }]);
+    }
+  }
+
   async function rate(item: Extract<Item, { kind: "assistant" }>, rating: "up" | "down") {
     patch(item.id, (x) => ({ ...x, rated: rating }) as Item);
     await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ turn_id: item.turnId, rating }) }).catch(() => {});
@@ -194,7 +226,7 @@ export function Chat({ role = "caller" }: { role?: "caller" | "staff" }) {
             {items.map((it) => <Row key={it.id} it={it} busy={busy} onPick={(s, slotsId) => {
               patch(slotsId, (x) => ({ ...x, picked: s.slot_id, used: true }) as Item);
               void run({ action: "slot_selected", slot_id: s.slot_id }, s.window_label);
-            }} onConfirm={confirm} onChangeTime={() => void run({ message: "I'd like a different time." }, "I'd like a different time.")}
+            }} onConfirm={confirm} onConfirmChange={confirmChange} onChangeTime={() => void run({ message: "I'd like a different time." }, "I'd like a different time.")}
               onRate={rate} bookedRef={bookedHeading} />)}
             {busy && status && <div className="typing" role="status">{status}<span className="dots" /></div>}
             {busy && !status && <div className="typing"><span className="dots">Assistant is typing</span></div>}
@@ -219,12 +251,22 @@ export function Chat({ role = "caller" }: { role?: "caller" | "staff" }) {
             <span className="label">I can help with</span>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               <li>Fees, hours and holidays</li><li>Comfort Club membership</li><li>Warranty terms</li><li>Service area</li><li>Booking a repair, tune-up or estimate</li>
+              <li>Once verified: your appointments, invoices and renewal date, and moving or cancelling a visit</li>
             </ul>
           </section>
+          {demoIds.length > 0 && (
+            <section className="card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <span className="label">Demo accounts to try</span>
+              <span className="small muted">Made-up customers from the test database. Give the assistant the phone number and ZIP when it asks.</span>
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {demoIds.map((d) => <li key={d.phone}><span className="mono small">{d.phone} · {d.zip}</span> <span className="small muted">({d.first_name}, {d.has})</span></li>)}
+              </ul>
+            </section>
+          )}
           <section className="card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <span className="label">A person handles</span>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              <li>Your bill, payments and refunds</li><li>Changing or cancelling a visit</li><li>Complaints</li><li>Anything about your account</li>
+              <li>Payments, billing disputes and refunds</li><li>Cancelling a membership</li><li>Changing account details</li><li>Complaints</li>
             </ul>
           </section>
           <section role="note" className="card" style={{ borderColor: "var(--danger)", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -238,10 +280,11 @@ export function Chat({ role = "caller" }: { role?: "caller" | "staff" }) {
   );
 }
 
-function Row({ it, busy, onPick, onConfirm, onChangeTime, onRate, bookedRef }: {
+function Row({ it, busy, onPick, onConfirm, onConfirmChange, onChangeTime, onRate, bookedRef }: {
   it: Item; busy: boolean;
   onPick: (s: SlotT, slotsId: string) => void;
   onConfirm: (it: Extract<Item, { kind: "confirm" }>) => void;
+  onConfirmChange: (it: Extract<Item, { kind: "change" }>) => void;
   onChangeTime: () => void;
   onRate: (it: Extract<Item, { kind: "assistant" }>, r: "up" | "down") => void;
   bookedRef: React.RefObject<HTMLHeadingElement | null>;
@@ -324,7 +367,42 @@ function Row({ it, busy, onPick, onConfirm, onChangeTime, onRate, bookedRef }: {
             <h2 ref={bookedRef} tabIndex={-1} className="ok" style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>✓ Booked</h2>
             <span>{it.data.service} on {it.data.when_label}.{it.data.tech_first_name ? ` Your technician is ${it.data.tech_first_name}.` : ""}</span>
             <span className="mono small muted">Reference {it.data.ref}</span>
-            <span className="small muted">To change or cancel, ask for a person and they&apos;ll take care of it.</span>
+            <span className="small muted">To change or cancel it later, ask me and have your phone number and ZIP ready.</span>
+          </section>
+        </div>
+      );
+    case "change": {
+      const cancel = it.data.action === "cancel";
+      return (
+        <div className="msg">
+          <span className="label">Confirm change</span>
+          <section aria-label={cancel ? "Cancellation details" : "New time details"} className="card confirm">
+            <h2 style={{ margin: 0, fontWeight: 600, fontSize: 18, lineHeight: "24px" }}>{cancel ? "Cancel this appointment?" : "Move this appointment?"}</h2>
+            <dl>
+              <dt className="muted">Service</dt><dd>{it.data.service}</dd>
+              <dt className="muted">{cancel ? "When" : "Now"}</dt><dd>{it.data.current_when}</dd>
+              {!cancel && <><dt className="muted">New time</dt><dd>{it.data.new_when}</dd></>}
+              <dt className="muted">Fee</dt><dd>{it.data.fee_label}</dd>
+            </dl>
+            {it.state !== "closed" ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <button className="btn btn-primary" disabled={it.state === "sending"} onClick={() => onConfirmChange(it)}>
+                  {it.state === "sending" ? "Saving…" : cancel ? "Confirm cancellation" : "Confirm new time"}</button>
+              </div>
+            ) : <span className="small muted">This card is closed.</span>}
+            <span className="small muted">Nothing changes until you press Confirm.</span>
+          </section>
+        </div>
+      );
+    }
+    case "changed":
+      return (
+        <div className="msg">
+          <span className="label">Appointment record</span>
+          <section aria-label="Change confirmed" className="card booked">
+            <h2 ref={bookedRef} tabIndex={-1} className="ok" style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{it.data.action === "cancel" ? "✓ Cancelled" : "✓ Moved"}</h2>
+            <span>{it.data.action === "cancel" ? `${it.data.service} on ${it.data.old_when_label} is cancelled.` : `${it.data.service} moved from ${it.data.old_when_label} to ${it.data.when_label}.`}</span>
+            <span className="mono small muted">Reference {it.data.ref}</span>
           </section>
         </div>
       );

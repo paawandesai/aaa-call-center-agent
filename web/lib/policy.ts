@@ -24,10 +24,12 @@ const SAFETY: [RegExp, Route & { kind: "safety" }][] = [
 
 const HANDOFF: [RegExp, HandoffReason, string][] = [
   [t(String.raw`\b(talk|speak|chat)\s+(to|with)\s+(a\s+|an\s+)?(real\s+|live\s+|actual\s+)?(person|human|agent|rep|representative|someone|somebody|operator|manager|supervisor)|\b(want|need|get|give)\s+(me\s+)?(a\s+)?(real|live)\s+(person|human)\b|\bhuman,? please\b|^\s*(agent|representative|operator)\s*$`), "human_requested", "human_requested"],
-  [t(String.raw`\b(cancel|reschedul|re-schedul|move|push back|change)\w*\b.{0,40}\b(appointment|visit|booking|tech(nician)? visit)|\bcancel (it|my)|\breschedule\b`), "cancel_reschedule", "cancel_reschedule"],
-  [t(String.raw`\b(my|the|this|an?)\s+(bill|invoice|statement|charge|balance)\b|\b(refund|overcharg|double[- ]charg|charged (me|twice)|dispute|payment plan|pay (my |the |an? )?(bill|invoice|balance)|past due|collections|card on file|autopay)\b`), "billing_account", "billing"],
-  [t(String.raw`\b(my|our)\s+(account|membership (status|renewal date)|renewal date)\b|\bwhen does my membership\b|\bam i (a member|on the plan|covered)\b|\bupdate my (address|phone|email|card)\b|\b(did|have|has) (you|y'all|you guys|anyone|meridian) (\w+ )?register|\b(unit|system|equipment) (is |was |got )?registered\b`), "billing_account", "account_lookup"],
-  [t(String.raw`\b(when|what time) (is|will) (my|the) (tech|technician|appointment)|\b(where is|eta for) (my|the) (tech|technician)|\bconfirm my (appointment|visit)|\bdo i have an appointment\b`), "out_of_scope", "existing_appointment"],
+  // Verified callers can look up appointments, invoices and renewal dates and move or cancel visits (tools, with a confirm
+  // card). Membership cancellations, payments, disputes, refunds and account edits still go to a person.
+  [t(String.raw`\bcancel\w*\b.{0,30}\b(membership|comfort club|maintenance plan|auto-?renew\w*)\b`), "billing_account", "membership_cancel"],
+  [t(String.raw`\b(refund|overcharg|double[- ]charg|charged (me )?twice|two .{0,20}charges|dispute|payment plan|pay (my |the |an? )?(bill|invoice|balance)|past due|collections|card on file|autopay|auto-pay|not what i agreed)\b|\bquoted me\b.{0,60}\b(invoice|bill)\b`), "billing_account", "billing"],
+  [t(String.raw`\bupdate my (address|phone|email|card)\b|\b(did|have|has) (you|y'all|you guys|anyone|meridian) (\w+ )?register|\b(unit|system|equipment) (is |was |got )?registered\b`), "billing_account", "account_lookup"],
+  [t(String.raw`\bmy window was\b|\bnobody'?s (here|come|shown up|called)\b|\b(no one|nobody) (has )?(came|come|showed|shown) up\b|\b(where is|eta for) (my|the) (tech|technician)\b|\btech(nician)? (never|didn'?t) (show|come)`), "out_of_scope", "tech_late"],
   [t(String.raw`\b(complain|complaint|terrible|awful|horrible|unacceptable|furious|ripped off|scam|lawsuit|lawyer|attorney|bbb|better business bureau|damaged my|broke my|rude)\b`), "complaint", "complaint"],
 ];
 

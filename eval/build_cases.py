@@ -23,9 +23,13 @@ OUT = Path(os.environ.get("MERIDIAN_EVAL_DIR", "/mnt/project-files/data/eval"))
 BOOK = {"repair_booking", "tune_up", "booking_plus_membership", "replacement_estimate", "warranty_claim"}
 KB = {"membership_info", "membership_renewal", "membership_upgrade", "warranty_coverage", "warranty_transfer"}
 CLOSE = {"wrong_number"}
+# Scope change (2026-10-17): a verified caller's own records and appointment changes are handled by the agent.
+# The eval assigns each of these cases a customer from the mock DB at run time (transcripts don't map to DB records).
+ACCOUNT = {"balance_inquiry": "balance", "invoice_question": "invoice", "appt_confirm": "appointment"}
+CHANGE = {"appt_reschedule": "reschedule", "appt_cancel": "cancel"}
 SAFETY = {"safety_emergency"}
-# Every other labeled intent escalates (billing, cancellations, existing appointments, complaints,
-# warranty registration status, jobs, commercial).
+# Every other labeled intent escalates (payments, disputes, refunds, autopay, membership cancellations, late
+# technicians, complaints, warranty registration status, jobs, commercial).
 
 # Required facts: at least one pattern must appear in the assistant's text (current KB values).
 REQUIRED = {
@@ -58,6 +62,10 @@ def expected(intent: str, req: str) -> dict:
         return {"outcome": "booked", "services": services}
     if intent in KB:
         return {"outcome": "answered", "required": REQUIRED[intent]}
+    if intent in ACCOUNT:
+        return {"outcome": "answered", "account": ACCOUNT[intent]}
+    if intent in CHANGE:
+        return {"outcome": "changed", "action": CHANGE[intent]}
     if intent in CLOSE:
         return {"outcome": "answered", "required": []}
     if intent == "unlabeled":
@@ -97,7 +105,11 @@ def main() -> None:
             assert_not_holdout(p.stem)
         cases.append(build(p))
     if split == "dev":
-        cases = sample_dev([c for c in cases if c["expected"]["outcome"] != "unknown"])
+        known = [c for c in cases if c["expected"]["outcome"] != "unknown"]
+        cases = sample_dev(known)
+        # The stratified sample has almost no account cases, so every discovery call in those intents is added.
+        have = {c["id"] for c in cases}
+        cases += [c for c in known if (c["intent"] in ACCOUNT or c["intent"] in CHANGE) and c["id"] not in have]
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f"{split}_cases.json").write_text(json.dumps({"forbidden": FORBIDDEN, "forbidden_membership": FORBIDDEN_MEMBERSHIP,
                                                          "cases": cases}, indent=1))

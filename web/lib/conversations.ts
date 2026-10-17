@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import type { PendingChange, Verified } from "./accounts";
 import type { HandoffReason } from "./policy";
 import type { PendingBooking, ServiceType } from "./scheduling";
 import type { Zone } from "./zones";
@@ -13,6 +14,9 @@ export interface Conversation {
   messages: Anthropic.Beta.BetaMessageParam[];
   offered: Map<number, OfferedSlot>;
   pending?: PendingBooking;
+  pendingChange?: PendingChange;
+  verified?: Verified; // set only by a successful phone + ZIP match; scopes every account read and change
+  verifyAttempts: number;
   safetyLock: boolean; // one-way: once set, no booking tools run in this conversation
   handoff?: HandoffReason;
   intents: string[];
@@ -34,7 +38,7 @@ export function getConversation(sessionId: string, id: string): Conversation {
   const key = `${sessionId}:${id}`;
   let c = store.get(key);
   if (!c) {
-    c = { id, sessionId, messages: [], offered: new Map(), safetyLock: false, intents: [], steps: [], caller: {}, notes: [], turns: new Map(), updatedAt: now };
+    c = { id, sessionId, messages: [], offered: new Map(), safetyLock: false, intents: [], steps: [], caller: {}, verifyAttempts: 0, notes: [], turns: new Map(), updatedAt: now };
     store.set(key, c);
   }
   c.updatedAt = now;
