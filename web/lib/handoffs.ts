@@ -16,7 +16,7 @@ export async function createHandoff(q: Queryable, c: Conversation, reason: Hando
      SELECT ins.id, (SELECT count(*)::int FROM handoffs WHERE status = 'open') + 1 AS position FROM ins`,
     [c.sessionId, reason, c.intents.at(-1) ?? null, JSON.stringify(c.steps.slice(-8)),
      JSON.stringify({ ...callerProvided, verified: !!c.verified }), slot ? JSON.stringify(slot) : null,
-     `AI-written: ${summary}\nCaller's last message (redacted): ${redact(lastCallerText).slice(0, 300)}`],
+     `AI-written: ${redact(summary)}\nCaller's last message (redacted): ${redact(lastCallerText).slice(0, 300)}`],
   );
   return rows[0];
 }

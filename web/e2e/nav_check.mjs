@@ -6,7 +6,7 @@ const shots = process.env.SHOTS ?? ".";
 const b = await chromium.launch({ executablePath: process.env.CHROME ?? "/opt/pw-browsers/chromium" });
 const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
 await p.goto(base + "/");
-await p.fill("#code", process.env.STAFF ?? "demo-staff-1");
+await p.fill("#code", (process.env.STAFF ?? ""));
 await p.check("input[type=checkbox]");
 await p.click("button[type=submit]");
 await p.waitForURL(/\/(chat|staff)/);

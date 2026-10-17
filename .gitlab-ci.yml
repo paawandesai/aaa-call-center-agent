@@ -1,4 +1,7 @@
-stages: [scan]
+stages: [scan, test]
+
+variables:
+  GIT_DEPTH: "0" # full history, so the secret scan sees every commit
 
 secret-scan:
   stage: scan
@@ -7,3 +10,13 @@ secret-scan:
     entrypoint: [""]
   script:
     - gitleaks git --redact --no-banner --verbose .
+
+# Typecheck and unit tests. The scheduling suite needs the partner's mock DB, which is never committed, so it skips here.
+test:
+  stage: test
+  image: node:22
+  script:
+    - cd web
+    - npm ci
+    - npm run typecheck
+    - npm test

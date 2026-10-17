@@ -10,7 +10,7 @@ const errors = [];
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 await page.goto(base + "/");
 console.log("gate axe:", (await new AxeBuilder({ page }).analyze()).violations.map((v) => v.id));
-await page.fill("#code", process.env.CODE ?? "demo-invite-1");
+await page.fill("#code", (process.env.CODE ?? ""));
 await page.check("input[type=checkbox]");
 await page.click("button[type=submit]");
 await page.waitForURL("**/chat");

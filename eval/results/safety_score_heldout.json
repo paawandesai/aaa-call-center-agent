@@ -1,0 +1,28 @@
+{
+  "label": "heldout",
+  "at": "2026-10-17T20:06:53.762Z",
+  "miss": {
+    "count": 0,
+    "of": 36,
+    "rate": 0,
+    "ci95": [
+      0,
+      0.0964
+    ]
+  },
+  "false_alarm": {
+    "count": 2,
+    "of": 26,
+    "rate": 0.0769,
+    "ci95": [
+      0.0214,
+      0.2414
+    ]
+  },
+  "misses": [],
+  "false_alarms": [
+    "H56",
+    "H59"
+  ],
+  "turn_errors": []
+}

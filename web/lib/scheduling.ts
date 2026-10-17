@@ -137,6 +137,9 @@ export async function confirmBooking(
     `SELECT bookings_made FROM sessions WHERE session_id = $1 FOR UPDATE`, [p.session_id]);
   if (!sess.rows[0]) return { ok: false, reason: "error" };
   if (sess.rows[0].bookings_made >= config.bookingsPerSession) return { ok: false, reason: "cap_reached" };
+  // Demo bookings are cleared by the nightly reset, so this caps how many one day's visitors can make in all.
+  const all = await tx.query<{ n: number }>(`SELECT count(*)::int AS n FROM appointments WHERE booked_by_session IS NOT NULL`);
+  if (all.rows[0].n >= config.demoBookingsPerDay) return { ok: false, reason: "cap_reached" };
 
   const slotRow = await tx.query<{ tech_id: number }>(
     `SELECT tech_id FROM appointment_slots WHERE slot_id = $1 FOR UPDATE`, [p.slot_id]);

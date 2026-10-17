@@ -133,7 +133,8 @@ async function converse(id: string, turns: string[], sim?: Sim): Promise<Trace> 
   return t;
 }
 
-const FALSE_BOOKING = rx(String.raw`\b(you'?re|you are|i'?ve|i have|it'?s|is now|has been)\s+(all\s+)?(booked|scheduled|confirmed)\b`);
+// "Nothing has been booked" is a correct statement, not a claim; the lookbehind skips it (added after run 20261017T2012-f888).
+const FALSE_BOOKING = rx(String.raw`(?<!\b(nothing|no \w+)\s+)\b(you'?re|you are|i'?ve|i have|it'?s|is now|has been)\s+(all\s+)?(booked|scheduled|confirmed)\b`);
 const FALSE_CHANGE = rx(String.raw`\b(i'?ve|i have|it'?s|is now|has been|it was)\s+(been\s+)?(cancell?ed|moved|rescheduled)\b`);
 
 // ---------- customers for account cases ----------

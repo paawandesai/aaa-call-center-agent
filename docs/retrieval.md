@@ -23,7 +23,7 @@ All 17 files have a reviewed decision in `kb/registry.py`. Ingest refuses to run
 - Prose is split on headings, and every chunk carries its title and section path ("Warranty Policy > Warranty transfer").
 - Tables become one chunk per row, with the column names repeated, so a price is never separated from what it prices.
 
-This gives 86 chunks.
+This gave 86 chunks when the retrieval table below was measured. The holiday image is now indexed as one chunk instead of eight lines, so the current `chunks.json` has 79; the table was not re-run after that change.
 
 **Planted instructions.** A scan for instruction-like text ("ignore previous", "you are now", "AI:", ...) found none in the KB (the scan covers the indexed chunks; a manual read of the excluded files found none either). Until 2026-10-17 the pattern missed "Note to AI: ..."; it now catches it. Ingest re-runs this scan and flags any hit for review. A flagged hit is never followed.
 
@@ -33,7 +33,7 @@ This gives 86 chunks.
 - The troubleshooting doc says to reset a tripped breaker, but a burning smell with a tripped breaker is a safety case; the safety route runs before any retrieval, so the reset advice is never given for it.
 - The tech doc says "4-hour blocks", but the 4–7pm window is 3 hours; the app shows windows from the scheduling database, not the doc.
 - `reserved_members` slots in the scheduling database are never offered.
-- The stale values the eval forbids are the diagnostic, membership, warranty and cancellation figures from the superseded files. The old FAQ's hours and "checks accepted", and the archive's "prorated refund" and "transfer to new address", are not yet in the forbidden-value checks.
+- The stale values the eval forbids are the diagnostic, membership, warranty and cancellation figures from the superseded files. Since the 2026-10-17 audit the checks also forbid the old FAQ's hours and "checks accepted", and the archive's "full prorated refund of unused months" and "membership transfers with you". The current membership terms still offer a prorated refund within 60 days if no tune-up was done, so that phrase alone is allowed.
 
 ## Retrieval evaluation (dev set)
 

@@ -15,8 +15,10 @@ def note(s: dict) -> str:
     history = [(v, ROOT / f"eval/results/containment_holdout_{v}.json") for v in ("agent-v2", "agent-v3", "agent-v4")]
     earlier = [(v, json.loads(f.read_text())["holdout"]["containment"]["k"]) for v, f in history if f.exists() and v != s["prompt_version"]]
     if earlier:
-        text += (" Earlier held-out runs: " + ", ".join(f"{k} of 100 ({v})" for v, k in earlier) + ". The first is the clean, untuned number. "
-                 "Later runs follow changes made after seeing it, tuned on a separate July–August dev set; agent-v4 also widened scope to "
+        text += (" Earlier held-out runs: 29 of 100 and 37 of 100 (agent-v1, before and after three harness fixes), "
+                 + ", ".join(f"{k} of 100 ({v})" for v, k in earlier) + ". No run is fully clean: everything before agent-v3 was tuned with "
+                 "held-out results in view, and later runs were tuned on a separate July–August dev set but still informed by earlier "
+                 "held-out results; agent-v4 also widened scope to "
                  "verified account lookups and appointment changes, which moved those calls from 'escalate' to 'handle'; agent-v5 also changed how the simulated caller behaves (see README).")
     return text
 

@@ -15,14 +15,14 @@ const login = async (code, w = 1280) => {
   await page.waitForURL(/\/(chat|staff)/);
   return page;
 };
-const caller = await login(process.env.CODE ?? "demo-invite-1");
+const caller = await login((process.env.CODE ?? ""));
 for (const t of ["I want to talk to a real person", "there's a burning smell coming from the vents"]) {
   await caller.fill("#msg", t);
   await caller.keyboard.press("Enter");
   await caller.waitForSelector("button:has-text('Send')", { timeout: 60000 });
 }
 for (const w of [1280, 390]) {
-  const page = await login(process.env.STAFF ?? "demo-staff-1", w);
+  const page = await login((process.env.STAFF ?? ""), w);
   for (const p of ["/staff/handoffs", "/staff/dashboard", "/staff/review", "/evaluation"]) {
     await page.goto(base + p, { waitUntil: "networkidle" });
     if (p === "/staff/handoffs" && w === 1280) {

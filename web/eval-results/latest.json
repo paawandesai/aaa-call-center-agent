@@ -4,7 +4,7 @@
  "config_id": "a9a0024562",
  "prompt_version": "agent-v5",
  "split": "the September 2026 calls (100 calls)",
- "note": "Booking cases whose zone had no openings for that service in the mock schedule are scored as correct handoffs. Estimated model cost for the run: about $0.05. Earlier held-out runs: 37 of 100 (agent-v2), 45 of 100 (agent-v3), 64 of 100 (agent-v4). The first is the clean, untuned number. Later runs follow changes made after seeing it, tuned on a separate July\u2013August dev set; agent-v4 also widened scope to verified account lookups and appointment changes, which moved those calls from 'escalate' to 'handle'; agent-v5 also changed how the simulated caller behaves (see README).",
+ "note": "Booking cases whose zone had no openings for that service in the mock schedule are scored as correct handoffs. Estimated model cost for the run: about $0.05. Earlier held-out runs: 29 of 100 and 37 of 100 (agent-v1, before and after three harness fixes), 37 of 100 (agent-v2), 45 of 100 (agent-v3), 64 of 100 (agent-v4). No run is fully clean: everything before agent-v3 was tuned with held-out results in view, and later runs were tuned on a separate July\u2013August dev set but still informed by earlier held-out results; agent-v4 also widened scope to verified account lookups and appointment changes, which moved those calls from 'escalate' to 'handle'; agent-v5 also changed how the simulated caller behaves (see README).",
  "containment": {
   "k": 69,
   "n": 100,

@@ -8,7 +8,7 @@ const p = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })
 const errors = [];
 p.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 await p.goto(base + "/");
-await p.fill("#code", process.env.CODE ?? "demo-invite-1");
+await p.fill("#code", (process.env.CODE ?? ""));
 await p.check("input[type=checkbox]");
 await p.click("button[type=submit]");
 await p.waitForURL(/\/chat/);

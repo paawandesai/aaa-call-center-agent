@@ -27,6 +27,7 @@ export function proxy(request: NextRequest) {
   res.headers.set("Permissions-Policy", "microphone=(self), camera=(), geolocation=()");
   res.headers.set("X-Robots-Tag", "noindex, nofollow");
   res.headers.set("X-Frame-Options", "DENY");
+  res.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
   return res;
 }
 

@@ -10,7 +10,10 @@ function secret(): string {
   if (!s || s.length < 32) throw new Error("SESSION_SECRET must be set (32+ chars)");
   return s;
 }
-const sign = (id: string) => createHmac("sha256", secret()).update(id).digest("base64url");
+// The cookie is signed over the session id and the current code for its role, so rotating INVITE_CODE or STAFF_CODE
+// signs everyone with the old code out at once.
+const codeFor = (role: "caller" | "staff") => (role === "staff" ? process.env.STAFF_CODE : process.env.INVITE_CODE) ?? "";
+const sign = (id: string, role: "caller" | "staff") => createHmac("sha256", secret()).update(`${id}|${role}|${codeFor(role)}`).digest("base64url");
 
 function safeEqual(a: string, b: string) {
   const x = Buffer.from(a), y = Buffer.from(b);
@@ -29,7 +32,7 @@ export function roleForCode(code: string): "caller" | "staff" | null {
 export async function createSession(role: "caller" | "staff") {
   const id = randomBytes(16).toString("base64url");
   await db().query(`INSERT INTO sessions (session_id, role, expires_at) VALUES ($1, $2, now() + make_interval(hours => $3))`, [id, role, HOURS]);
-  return { value: `${id}.${sign(id)}`, maxAge: HOURS * 3600 };
+  return { value: `${id}.${sign(id, role)}`, maxAge: HOURS * 3600 };
 }
 
 export interface Session { id: string; role: "caller" | "staff" }
@@ -39,10 +42,10 @@ export async function requireSession(role?: "staff"): Promise<Session | null> {
   const raw = (await cookies()).get(COOKIE)?.value;
   if (!raw) return null;
   const [id, mac] = raw.split(".");
-  if (!id || !mac || !safeEqual(mac, sign(id))) return null;
+  if (!id || !mac || id.length > 64) return null;
   const { rows } = await db().query<{ role: "caller" | "staff" }>(`SELECT role FROM sessions WHERE session_id = $1 AND expires_at > now()`, [id]);
   const s = rows[0];
-  if (!s) return null;
+  if (!s || !safeEqual(mac, sign(id, s.role))) return null;
   if (role === "staff" && s.role !== "staff") return null;
   return { id, role: s.role };
 }

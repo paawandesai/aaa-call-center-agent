@@ -34,25 +34,27 @@ category: the kind of real, present danger the message reports or suggests, or "
 - threat_by_caller: the caller threatens to hurt someone.
 - caller_in_danger: someone is threatening, attacking or breaking in on the caller.
 - domestic_violence: a partner or family member is hurting or threatening the caller.
-- other_emergency: any other present danger to a person.
-Ordinary equipment problems (no heat, no cooling, a leak, a noise, a part question, a price question about detectors) are "none". So are past events that are over and questions about safety devices.
+- other_emergency: any other present danger to a person's life or health.
+Ordinary equipment problems (no heat, no cooling, a leak, a noise, a part question, a price question about detectors) are "none". So are past events that are over and questions about safety devices. A hot or cold home is "none" unless the message says a person has symptoms or is especially vulnerable and suffering (an infant, an elderly or sick person).
 
 figurative_or_name: true when every danger-sounding word in the message is an idiom, a joke, a name, or about equipment rather than a person ("my wife will kill me", "this heat is killing me", "the compressor is dying", "Kat Smoke"). When in doubt about whether a person may be in danger, choose the danger category and false.`;
 
-// verdict is null when the check could not run (two failed attempts, 8 seconds each). The caller then fails closed.
+// verdict is null when the check could not run (two attempts, each with the SDK's own retries on rate limits and overload). The caller then fails closed.
 export async function classifySafety(anthropic: Anthropic, text: string, lastAssistant: string | undefined, signal?: AbortSignal): Promise<{ verdict: Verdict | null; usage: Usage }> {
   const usage = emptyUsage();
   const content = `${lastAssistant ? `The assistant's previous message: <assistant>${lastAssistant.slice(0, 600)}</assistant>\n` : ""}The caller's latest message: <caller>${text}</caller>`;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const r = await anthropic.messages.parse(
-        { model: config.safetyModel, max_tokens: 200, system: SYSTEM, messages: [{ role: "user", content }], output_config: { format: zodOutputFormat(Verdict) } },
-        { signal, timeout: 8_000, maxRetries: 0 },
+        { model: config.safetyModel, max_tokens: 2000, system: SYSTEM, messages: [{ role: "user", content }], output_config: { effort: "low", format: zodOutputFormat(Verdict) } },
+        { signal, timeout: 10_000, maxRetries: 2 },
       );
-      usage.input += r.usage.input_tokens; usage.output += r.usage.output_tokens;
+      usage.input += r.usage.input_tokens; usage.output += r.usage.output_tokens; // thinking tokens bill as output
       if (r.parsed_output) return { verdict: r.parsed_output, usage };
+      console.warn(`safety check attempt ${attempt + 1} returned no verdict (stop ${r.stop_reason})`);
     } catch (e) {
       if (e instanceof Anthropic.APIUserAbortError) throw e;
+      console.warn(`safety check attempt ${attempt + 1} failed: ${e instanceof Anthropic.APIError ? `status ${e.status ?? "conn"}` : (e as Error).name}`);
     }
   }
   return { verdict: null, usage };

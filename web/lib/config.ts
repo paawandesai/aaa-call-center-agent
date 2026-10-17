@@ -12,6 +12,8 @@ export const config = {
   retrievalK: Number(process.env.RETRIEVAL_K ?? 5),
   minRetrievalScore: Number(process.env.MIN_RETRIEVAL_SCORE ?? 0.55),
   bookingsPerSession: Number(process.env.BOOKINGS_PER_SESSION ?? 2),
+  demoBookingsPerDay: Number(process.env.DEMO_BOOKINGS_PER_DAY ?? 60),
+  bookingAttemptsPerIpDay: Number(process.env.BOOKING_ATTEMPTS_PER_IP_DAY ?? 10),
   maxSlotsShown: 4,
   tz: "America/Chicago",
   // The partner data's today is 2026-10-16; slots run to 2026-11-05. DEMO_NOW pins the clock exactly (tests and the

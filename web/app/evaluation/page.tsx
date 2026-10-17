@@ -58,7 +58,7 @@ export default async function Evaluation() {
         <div className="stack-8" style={{ maxWidth: 760 }}>
           <span className="label">Eval run {r.run_id} · {r.created_at.slice(0, 10)} · config {r.config_id} · prompt {r.prompt_version}</span>
           <h1 className="h1">How well the assistant does on real calls it never saw</h1>
-          <p className="muted" style={{ margin: 0 }}>The test set is {r.split}, held out before any analysis, paraphrased and redacted. Each item is scored by code against facts from the current knowledge base. No AI grades the AI.</p>
+          <p className="muted" style={{ margin: 0 }}>The test set is {r.split}, held out before call-driver discovery; each caller's opening line is verbatim from the redacted transcript. Each item is scored by code against facts from the current knowledge base. No AI grades the AI.</p>
           {r.note && <p style={{ margin: 0 }}>{r.note}</p>}
         </div>
 

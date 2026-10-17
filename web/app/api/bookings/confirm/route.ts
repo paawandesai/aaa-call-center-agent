@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { findConversation } from "@/lib/conversations";
 import { db } from "@/lib/db";
-import { allow } from "@/lib/ratelimit";
+import { allow, clientIp } from "@/lib/ratelimit";
+import { config } from "@/lib/config";
 import { confirmBooking, findSlots, isConstraintViolation, whenLabel } from "@/lib/scheduling";
 import { requireSession } from "@/lib/session";
 import { record } from "@/lib/telemetry";
@@ -23,7 +24,9 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
   const b = parsed.data;
-  const rl = allow(`confirm:${session.id}`, 10, 60_000);
+  // Sessions are free to create, so the per-session cap alone doesn't stop one visitor filling the schedule.
+  let rl = allow(`confirm:${session.id}`, 10, 60_000);
+  if (rl.ok) rl = allow(`confirmip:${clientIp(req)}`, config.bookingAttemptsPerIpDay, 86_400_000);
   if (!rl.ok) return Response.json({ error: "rate_limited", retry_after_s: rl.retryAfterS }, { status: 429 });
 
   const conv = findConversation(session.id, b.conversation_id);
