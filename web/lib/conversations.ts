@@ -26,7 +26,9 @@ export interface Conversation {
   caller: { zip?: string; name?: string };
   notes: string[]; // app events (e.g. a confirmed booking) passed to the model with the next caller message
   lastBooking?: { key: string; body: unknown }; // the confirm route's last success, so a retried Confirm gets the same answer
+  lastChange?: { key: string; body: unknown }; // the same for moves and cancellations
   turns: Map<string, number>; // turn_id -> message count after the turn, for retry dedupe
+  clientIp?: string; // set by the chat route; only used to cap handoff tickets per IP, never stored
   updatedAt: number;
 }
 
@@ -35,9 +37,15 @@ const TTL = 2 * 60 * 60 * 1000;
 const g = globalThis as { __conversations?: Map<string, Conversation> };
 const store = (g.__conversations ??= new Map<string, Conversation>());
 
+// Drops chats 2 hours after their last message. Runs on every chat request and from the 5-minute reset timer, so a chat
+// is gone on time even when no one else is chatting.
+export function sweepConversations(now = Date.now()) {
+  for (const [k, c] of store) if (now - c.updatedAt > TTL) store.delete(k);
+}
+
 export function getConversation(sessionId: string, id: string): Conversation {
   const now = Date.now();
-  for (const [k, c] of store) if (now - c.updatedAt > TTL) store.delete(k);
+  sweepConversations(now);
   const key = `${sessionId}:${id}`;
   let c = store.get(key);
   if (!c) {

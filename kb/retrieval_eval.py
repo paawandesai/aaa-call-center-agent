@@ -23,8 +23,16 @@ from fastembed import TextEmbedding
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from registry import REGISTRY  # noqa: E402
 
-KB = Path(os.environ.get("MERIDIAN_DATA_DIR", "/mnt/project-files/data/meridian_dataset")) / "knowledge_base"
-OUT = Path(os.environ.get("MERIDIAN_KB_OUT", "/mnt/project-files/data/kb"))
+def _env_path(name: str) -> Path:
+    """A required path from the environment (see .env.example); there is no default, because the data lives outside the repo."""
+    v = os.environ.get(name)
+    if not v:
+        raise SystemExit(f"set {name} (see .env.example)")
+    return Path(v)
+
+
+KB = _env_path("MERIDIAN_DATA_DIR") / "knowledge_base"
+OUT = _env_path("MERIDIAN_KB_OUT")
 EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 TOKEN = re.compile(r"[a-z0-9$%]+")

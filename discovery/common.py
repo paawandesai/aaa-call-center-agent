@@ -3,8 +3,16 @@ import hashlib
 import os
 from pathlib import Path
 
-DATA_DIR = Path(os.environ.get("MERIDIAN_DATA_DIR", "/mnt/project-files/data/meridian_dataset"))
-REDACTED_DIR = Path(os.environ.get("MERIDIAN_REDACTED_DIR", "/mnt/project-files/data/redacted"))
+def _env_path(name: str) -> Path:
+    """A required path from the environment (see .env.example); there is no default, because the data lives outside the repo."""
+    v = os.environ.get(name)
+    if not v:
+        raise SystemExit(f"set {name} (see .env.example)")
+    return Path(v)
+
+
+DATA_DIR = _env_path("MERIDIAN_DATA_DIR")
+REDACTED_DIR = _env_path("MERIDIAN_REDACTED_DIR")
 TRANSCRIPTS = DATA_DIR / "call_transcripts"
 MANIFEST = Path(__file__).resolve().parent.parent / "eval" / "holdout_manifest.txt"
 

@@ -5,7 +5,8 @@ const g = globalThis as { __rl?: Map<string, { start: number; count: number }> }
 const windows = (g.__rl ??= new Map());
 
 let lastPrune = 0;
-export function allow(key: string, limit: number, windowMs: number): { ok: true } | { ok: false; retryAfterS: number } {
+// count=false only checks the window, for limits that count failures after the fact.
+export function allow(key: string, limit: number, windowMs: number, count = true): { ok: true } | { ok: false; retryAfterS: number } {
   const now = Date.now();
   // Drop windows older than the longest one in use (a day), at most once a minute, so the map can't grow without bound.
   if (now - lastPrune > 60_000) {
@@ -14,11 +15,11 @@ export function allow(key: string, limit: number, windowMs: number): { ok: true 
   }
   const w = windows.get(key);
   if (!w || now - w.start >= windowMs) {
-    windows.set(key, { start: now, count: 1 });
+    if (count) windows.set(key, { start: now, count: 1 });
     return { ok: true };
   }
   if (w.count >= limit) return { ok: false, retryAfterS: Math.ceil((w.start + windowMs - now) / 1000) };
-  w.count++;
+  if (count) w.count++;
   return { ok: true };
 }
 
@@ -42,6 +43,15 @@ export async function overSpendCap(q: Queryable): Promise<boolean> {
 
 // The client address as Railway's edge proxy saw it: the last X-Forwarded-For entry is the one the proxy appended,
 // so a client can't choose it by sending its own header.
+// One rate-limit bucket per IPv4 address, or per IPv6 /64 (one home or host usually gets a whole /64).
+export function ipBucket(ip: string): string {
+  if (!ip.includes(":")) return ip;
+  const [head, tail = ""] = ip.split("::");
+  const h = head ? head.split(":") : [];
+  const groups = [...h, ...Array(Math.max(0, 8 - h.length - (tail ? tail.split(":").length : 0))).fill("0"), ...(tail ? tail.split(":") : [])];
+  return `${groups.slice(0, 4).map((g) => g.toLowerCase().replace(/^0+(?=.)/, "")).join(":")}::/64`;
+}
+
 export function clientIp(req: Request): string {
   const parts = (req.headers.get("x-forwarded-for") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
   return parts.at(-1) ?? "unknown";

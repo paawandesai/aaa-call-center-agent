@@ -21,7 +21,7 @@ if (rows[0].n === 0 || process.env.SEED_FORCE === "1") {
 } else if (process.env.RESET_ON_DEPLOY === "1") {
   await resetLiveTables(d);
 }
-const kb = await d.query<{ n: number }>(`SELECT count(*)::int AS n FROM kb_chunks WHERE embed_model = $1`, [config.embedModel]);
+const kb = await d.query<{ n: number }>(`SELECT count(*)::int AS n FROM kb_chunks WHERE embed_model = $1`, [config.embedTag]);
 const chunks = path.join(seedDir, "chunks.json");
 if ((kb.rows[0].n === 0 || process.env.KB_FORCE === "1") && existsSync(chunks)) console.log("kb chunks loaded:", await loadKb(d, chunks));
 // Synthetic staff-console activity (labelled demo_); set DEMO_ACTIVITY=0 to skip.

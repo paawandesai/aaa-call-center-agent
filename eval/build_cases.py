@@ -18,7 +18,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "discovery"))
 from common import REDACTED_DIR, assert_not_holdout, call_hash, holdout_hashes  # noqa: E402
 from classify import first_request, label  # noqa: E402
 
-OUT = Path(os.environ.get("MERIDIAN_EVAL_DIR", "/mnt/project-files/data/eval"))
+def _env_path(name: str) -> Path:
+    """A required path from the environment (see .env.example); there is no default, because the data lives outside the repo."""
+    v = os.environ.get(name)
+    if not v:
+        raise SystemExit(f"set {name} (see .env.example)")
+    return Path(v)
+
+
+OUT = _env_path("MERIDIAN_EVAL_DIR")
 
 BOOK = {"repair_booking", "tune_up", "booking_plus_membership", "replacement_estimate", "warranty_claim"}
 KB = {"membership_info", "membership_renewal", "membership_upgrade", "warranty_coverage", "warranty_transfer"}

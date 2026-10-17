@@ -18,7 +18,7 @@ export const AgentEvent = z.discriminatedUnion("type", [
   z.object({ type: z.literal("change_request"), action: z.enum(["cancel", "reschedule"]), appointment_id: z.number().int(), service: z.string(),
     current_when: z.string(), new_when: z.string().optional(), new_slot_id: z.number().int().optional(), fee_label: z.string() }),
   z.object({ type: z.literal("changed"), action: z.enum(["cancel", "reschedule"]), ref: z.string(), when_label: z.string(), old_when_label: z.string(), service: z.string() }),
-  z.object({ type: z.literal("handoff"), reason_enum: HandoffReasonSchema, summary_for_caller: z.string(), queue_position: z.number().int().optional() }),
+  z.object({ type: z.literal("handoff"), reason_enum: HandoffReasonSchema, summary_for_caller: z.string(), summary_source: z.enum(["model", "fixed"]).optional(), queue_position: z.number().int().optional() }),
   z.object({ type: z.literal("safety"), script: z.enum(["gas_co_fire", "self_harm", "medical", "electrical", "threat", "domestic_violence", "in_danger", "urgent"]), text: z.string() }),
   z.object({ type: z.literal("error"), code: z.string(), retryable: z.boolean() }),
   z.object({ type: z.literal("done"), turn_id: z.string(), latency_ms: z.number() }),

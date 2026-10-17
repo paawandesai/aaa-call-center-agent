@@ -23,7 +23,7 @@ All 17 files have a reviewed decision in `kb/registry.py`. Ingest refuses to run
 - Prose is split on headings, and every chunk carries its title and section path ("Warranty Policy > Warranty transfer").
 - Tables become one chunk per row, with the column names repeated, so a price is never separated from what it prices.
 
-This gave 86 chunks when the retrieval table below was measured. The holiday image is now indexed as one chunk instead of eight lines, so the current `chunks.json` has 79; the table was not re-run after that change.
+This gave 86 chunks when the retrieval table below was measured. The holiday image is now indexed as one chunk instead of eight lines, so the current `chunks.json` has 79. The table itself was not re-run, but the eval re-measures the curated retriever through the app's own pgvector query on the 79 chunks every run, and gets the same hit@5 (23 of 24) and MRR (0.835).
 
 **Planted instructions.** A scan for instruction-like text ("ignore previous", "you are now", "AI:", ...) found none in the KB (the scan covers the indexed chunks; a manual read of the excluded files found none either). Until 2026-10-17 the pattern missed "Note to AI: ..."; it now catches it. Ingest re-runs this scan and flags any hit for review. A flagged hit is never followed.
 

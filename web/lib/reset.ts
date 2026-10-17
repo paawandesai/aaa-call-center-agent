@@ -1,4 +1,5 @@
 import { db, type Db } from "./db";
+import { sweepConversations } from "./conversations";
 import { seedDemoActivity } from "./demoseed";
 import { resetLiveTablesIn } from "./seed";
 
@@ -37,7 +38,7 @@ export async function maybeNightlyReset(d: Db = db()): Promise<boolean> {
 export function startResetTimer() {
   const g = globalThis as { __resetTimer?: ReturnType<typeof setInterval> };
   if (g.__resetTimer || !process.env.DATABASE_URL) return;
-  const tick = () => { checkedAt = 0; maybeNightlyReset().catch(() => {}); };
+  const tick = () => { sweepConversations(); checkedAt = 0; maybeNightlyReset().catch(() => {}); };
   g.__resetTimer = setInterval(tick, 5 * 60_000);
   g.__resetTimer.unref?.();
   setTimeout(tick, 30_000).unref?.();

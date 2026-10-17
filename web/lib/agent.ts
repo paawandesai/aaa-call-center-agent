@@ -130,6 +130,7 @@ export interface TurnResult {
   firstTokenMs?: number;
   toolCalls: string[];
   safetyCheck?: string; // the classifier's result: clear, failed, or the hazard category it locked on
+  safetyUsage?: Usage; // the classifier's tokens, priced at SAFETY_MODEL
 }
 
 // What the caller sees under "What I've passed on" for policy-routed handoffs.
@@ -173,7 +174,7 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     c.messages.push({ role: "assistant", content: reply });
     if (reason) {
       // One handoff per reason per conversation: repeating the request doesn't add another ticket to the queue.
-      const h = c.handoff === reason ? undefined : await createHandoff(deps.db, c, reason, `Routed by policy (${intent}).`, text);
+      const h = c.handoff === reason ? undefined : await createHandoff(deps.db, c, reason, `Sent by a fixed rule, not written by AI: ${intent.replace(/_/g, " ")}.`, text, "policy");
       c.handoff = reason;
       emit({ type: "handoff", reason_enum: reason, summary_for_caller: INTENT_SUMMARY[intent] ?? HANDOFF_COPY[reason], queue_position: h?.position });
     }
@@ -189,7 +190,7 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     // The knowledge-base search starts alongside the check so the check adds little wait to an ordinary question.
     if (r.kind === "model" && !isLogistics(text)) { searchEarly = deps.search(text); searchEarly.catch(() => {}); }
     const { verdict, usage } = await classifySafety(deps.anthropic, text, lastAssistantText(c), signal);
-    res.usage = addUsage(res.usage, usage);
+    res.safetyUsage = usage;
     res.safetyCheck = !verdict ? "failed" : verdictLocks(verdict) ? verdict.category : "clear";
     if (verdict && verdictLocks(verdict)) {
       const script = VERDICT_SCRIPT[verdict.category as keyof typeof VERDICT_SCRIPT];
@@ -314,7 +315,7 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     // Roll back this turn's unanswered tail so a retry starts clean; earlier turns are untouched.
     c.messages.length = base;
     // An aborted turn still cost tokens: the route reads them from the error and counts them toward the spend cap.
-    if (e instanceof Anthropic.APIUserAbortError) throw Object.assign(e, { usage: res.usage });
+    if (e instanceof Anthropic.APIUserAbortError) throw Object.assign(e, { usage: res.usage, safetyUsage: res.safetyUsage });
     const retryable = e instanceof Anthropic.RateLimitError || e instanceof Anthropic.InternalServerError || e instanceof Anthropic.APIConnectionError;
     emit({ type: "error", code: e instanceof Anthropic.APIError ? `model_${e.status ?? "conn"}` : "server_error", retryable });
     return { ...res, outcome: "error" };
@@ -415,7 +416,7 @@ async function modelHandoff(deps: Deps, c: Conversation, asked: (typeof MODEL_HA
   res.outcome = reason === "safety" ? "safety" : "handoff";
   res.handoffReason = reason;
   const forCaller = script ? (INTENT_SUMMARY[script] ?? INTENT_SUMMARY.urgent) : summary.slice(0, 400);
-  emit({ type: "handoff", reason_enum: reason, summary_for_caller: forCaller, queue_position: h?.position });
+  emit({ type: "handoff", reason_enum: reason, summary_for_caller: forCaller, summary_source: script ? "fixed" : "model", queue_position: h?.position });
 }
 
 async function runTool(

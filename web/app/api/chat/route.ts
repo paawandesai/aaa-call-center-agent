@@ -4,7 +4,7 @@ import { getConversation } from "@/lib/conversations";
 import { defaultDeps } from "@/lib/deps";
 import { AgentEvent } from "@/lib/events";
 import { config } from "@/lib/config";
-import { costUsd, type Usage } from "@/lib/pricing";
+import { turnCostUsd, type Usage } from "@/lib/pricing";
 import { addSpend, allow, clientIp, overSpendCap } from "@/lib/ratelimit";
 import { db } from "@/lib/db";
 import { whenLabel } from "@/lib/scheduling";
@@ -28,11 +28,8 @@ const busy = ((globalThis as { __busy?: Set<string> }).__busy ??= new Set<string
 export async function POST(req: Request) {
   const session = await requireSession();
   if (!session) return Response.json({ error: "unauthorized" }, { status: 401 });
-  const parsed = Body.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
-  const b = parsed.data;
-
-  // Per session, and per client IP so new sessions from one invite code don't each get a fresh allowance.
+  // Per session, and per client IP so new sessions from one invite code don't each get a fresh allowance. Checked before
+  // the body is read.
   const ip = clientIp(req);
   for (const [key, limit, ms] of [[`chat:${session.id}`, 20, 60_000], [`chatday:${session.id}`, 300, 86_400_000],
     [`chatip:${ip}`, 40, 60_000], [`chatipday:${ip}`, 600, 86_400_000]] as const) {
@@ -40,9 +37,13 @@ export async function POST(req: Request) {
     if (!r.ok) void record({ session_id: session.id, kind: "rate_limit", outcome: "429" });
     if (!r.ok) return Response.json({ error: "rate_limited", retry_after_s: r.retryAfterS }, { status: 429, headers: { "Retry-After": String(r.retryAfterS) } });
   }
+  const parsed = Body.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
+  const b = parsed.data;
 
   await maybeNightlyReset().catch(() => {});
   const conv = getConversation(session.id, b.conversation_id);
+  conv.clientIp = ip;
   let text = b.message;
   if (b.action === "human") text = "I'd like to talk to a person, please.";
   if (b.action === "slot_selected") {
@@ -74,14 +75,20 @@ export async function POST(req: Request) {
         } else {
           // Taken before any await, so two requests for the same conversation can't both start a turn.
           busy.add(lockKey);
-          let usage: Usage | undefined;
+          let spent: { usage?: Usage; safetyUsage?: Usage } | undefined;
           try {
             // If the spend total can't be read, the turn is refused: the cap fails closed.
             if (await overSpendCap(db()).catch(() => true)) {
               write({ type: "error", code: "capacity", retryable: false });
+              void record({ session_id: session.id, turn_id: b.turn_id, kind: "capacity" });
             } else {
-              const r = await runTurn(defaultDeps(), conv, text!, write, req.signal, b.action === "slot_selected").catch((e) => { usage = (e as { usage?: Usage }).usage; throw e; });
-              usage = r.usage;
+              const r = await runTurn(defaultDeps(), conv, text!, write, req.signal, b.action === "slot_selected").catch((e) => {
+                spent = e as { usage?: Usage; safetyUsage?: Usage };
+                // A turn that threw still counts as a failure for the health check, unless the caller just left.
+                if (!req.signal.aborted) void record({ session_id: session.id, turn_id: b.turn_id, kind: "turn", outcome: "error", latency_ms: Date.now() - started });
+                throw e;
+              });
+              spent = r;
               if (r.outcome !== "error") conv.turns.set(b.turn_id, conv.messages.length);
               void record({ session_id: session.id, turn_id: b.turn_id, kind: "turn", intent: r.intent, outcome: r.outcome,
                 reason: r.handoffReason, latency_ms: Date.now() - started, first_token_ms: r.firstTokenMs, input_tokens: r.inputTokens,
@@ -90,7 +97,7 @@ export async function POST(req: Request) {
           } finally {
             busy.delete(lockKey);
             // Counted here so a turn the caller abandoned mid-stream still counts toward the daily cap.
-            if (usage) await addSpend(db(), costUsd(config.model, usage)).catch(() => {});
+            if (spent) await addSpend(db(), turnCostUsd(config.model, config.safetyModel, spent)).catch(() => {});
           }
         }
         write({ type: "done", turn_id: b.turn_id, latency_ms: Date.now() - started });

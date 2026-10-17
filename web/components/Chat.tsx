@@ -123,8 +123,8 @@ export function Chat({ role = "caller", demoIds = [] }: { role?: "caller" | "sta
               break;
             }
             case "safety":
+              // The alert card announces the script itself, so the finished-reply announcement below doesn't repeat it.
               setItems((xs) => [...xs, { id: rid(), kind: "safety", text: ev.text }]);
-              finalText ||= ev.text;
               break;
             case "error":
               setItems((xs) => [...xs, { id: rid(), kind: "error", code: ev.code,
@@ -215,7 +215,7 @@ export function Chat({ role = "caller", demoIds = [] }: { role?: "caller" | "sta
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn" disabled={busy} onClick={() => void run({ action: "human" }, "Talk to a person")}>Talk to a person</button>
-          <button className="btn btn-quiet" onClick={() => { abort.current?.abort(); setConversationId(rid()); setItems([{ id: "greet", kind: "assistant", text: GREETING, turnId: "greeting" }]); }}>New chat</button>
+          <button className="btn btn-quiet" onClick={() => { abort.current?.abort(); setConversationId(rid()); setItems([{ id: "greet", kind: "assistant", text: GREETING, turnId: "greeting" }]); setLive("New chat started"); composer.current?.focus(); }}>New chat</button>
           {role === "staff" && <a className="btn btn-quiet" href="/staff/handoffs" style={{ textDecoration: "none" }}>Staff console</a>}
           <SignOut />
         </div>
@@ -224,7 +224,10 @@ export function Chat({ role = "caller", demoIds = [] }: { role?: "caller" | "sta
       <div className="page chat-body">
         <main className="chat-main">
           <div className="sr-only" aria-live="polite">{live}</div>
-          <div role="log" aria-label="Conversation" className="log">
+          <h1 className="sr-only">Chat with Meridian&apos;s automated assistant</h1>
+          {/* The log doesn't announce itself (a streamed reply would be read in fragments); the region above reads each
+              finished reply once, and safety scripts are read by their own alert. */}
+          <div role="log" aria-label="Conversation" aria-live="off" aria-busy={busy} className="log">
             {items.map((it) => <Row key={it.id} it={it} busy={busy} onPick={(s, slotsId) => {
               patch(slotsId, (x) => ({ ...x, picked: s.slot_id, used: true }) as Item);
               void run({ action: "slot_selected", slot_id: s.slot_id }, s.window_label);
@@ -238,13 +241,13 @@ export function Chat({ role = "caller", demoIds = [] }: { role?: "caller" | "sta
           <div className="composer">
             <form onSubmit={(e) => { e.preventDefault(); send(); }}>
               <label htmlFor="msg" className="sr-only">Message</label>
-              <textarea id="msg" ref={composer} rows={2} placeholder="Type your question" value={draft} maxLength={2000} autoFocus
+              <textarea id="msg" ref={composer} rows={2} placeholder="Type your question" value={draft} maxLength={2000}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} />
               {busy ? <button type="button" className="btn" onClick={() => abort.current?.abort()}>Stop</button>
                 : <button type="submit" className="btn btn-primary" disabled={!draft.trim()}>Send</button>}
             </form>
-            <p className="small muted" style={{ margin: "8px 0 0" }}>Answers are written by AI from Meridian&apos;s current documents and can be wrong. Sources are shown with each answer. Messages go to Anthropic&apos;s Claude model; handoffs keep the name and ZIP you gave and a short excerpt for 7 days. Please use made-up details.</p>
+            <p className="small muted" style={{ margin: "8px 0 0" }}>Answers are written by AI from Meridian&apos;s current documents and can be wrong. Sources are shown with each answer. Messages go to Anthropic&apos;s Claude model; handoffs keep the name and ZIP you gave and a short excerpt for about 7 days. Please use made-up details. <a href="/privacy">Privacy notice</a></p>
           </div>
         </main>
 
@@ -273,13 +276,23 @@ export function Chat({ role = "caller", demoIds = [] }: { role?: "caller" | "sta
           </section>
           <section role="note" className="card" style={{ borderColor: "var(--danger)", display: "flex", flexDirection: "column", gap: 6 }}>
             <strong className="bad">Smell gas or smoke?</strong>
-            <span>Leave the house now and call 911. Don&apos;t use this chat for emergencies.</span>
+            <span>Leave the house now and call <a href="tel:911">911</a>. Don&apos;t use this chat for emergencies.</span>
           </section>
           <a href="/evaluation" className="small">How we measured this assistant</a>
         </aside>
       </div>
     </div>
   );
+}
+
+// Crisis numbers in a safety script become tap-to-call (or tap-to-text) links.
+const CALL = /(text START to 88788|1-800-799-7233|\b911\b|\b988\b)/;
+function withCallLinks(text: string) {
+  return text.split(CALL).map((part, i) => {
+    if (i % 2 === 0) return part;
+    if (part.startsWith("text START")) return <a key={i} href="sms:88788?&body=START">{part}</a>;
+    return <a key={i} href={`tel:${part.replace(/-/g, "")}`}>{part}</a>;
+  });
 }
 
 function Row({ it, busy, onPick, onConfirm, onConfirmChange, onChangeTime, onRate, bookedRef }: {
@@ -313,7 +326,7 @@ function Row({ it, busy, onPick, onConfirm, onConfirmChange, onChangeTime, onRat
             )}
           </div>
           {it.turnId !== "greeting" && it.text && (
-            <div style={{ display: "flex", gap: 8 }} aria-label="Rate this answer">
+            <div role="group" style={{ display: "flex", gap: 8 }} aria-label="Rate this answer">
               <button className="btn btn-quiet" style={{ minHeight: 32, padding: "0 10px" }} aria-pressed={it.rated === "up"} onClick={() => onRate(it, "up")}>Helpful</button>
               <button className="btn btn-quiet" style={{ minHeight: 32, padding: "0 10px" }} aria-pressed={it.rated === "down"} onClick={() => onRate(it, "down")}>Not helpful</button>
             </div>
@@ -327,9 +340,9 @@ function Row({ it, busy, onPick, onConfirm, onConfirmChange, onChangeTime, onRat
           <div className="card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {it.note && <span>{it.note}</span>}
             {it.slots.length === 0 ? <span>No openings came back. Ask for a person and they&apos;ll find a time.</span> : (
-              <div role="radiogroup" aria-label="Available times" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div role="group" aria-label="Available times" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {it.slots.map((s) => (
-                  <button key={s.slot_id} role="radio" aria-checked={it.picked === s.slot_id} className="slot" disabled={it.used || busy} onClick={() => onPick(s, it.id)}>
+                  <button key={s.slot_id} aria-pressed={it.picked === s.slot_id} className="slot" disabled={it.used || busy} onClick={() => onPick(s, it.id)}>
                     <span style={{ fontWeight: 600 }}>{s.window_label}</span>
                   </button>
                 ))}
@@ -414,7 +427,7 @@ function Row({ it, busy, onPick, onConfirm, onConfirmChange, onChangeTime, onRat
           <span className="label">Passed to our team</span>
           <section aria-label="Handoff" className="card handoff">
             <strong>A person on our team will pick this up.</strong>
-            <span><span className="muted">What I&apos;ve passed on: </span>{it.data.summary_for_caller}</span>
+            <span><span className="muted">{it.data.summary_source === "model" ? "What I've passed on (AI-written): " : "What I've passed on: "}</span>{it.data.summary_for_caller}</span>
             {it.data.queue_position !== undefined && <span className="small muted">Position in the test queue: {it.data.queue_position}</span>}
             <span className="small muted">Demo: this is a test queue. No real person will contact you.</span>
           </section>
@@ -425,7 +438,7 @@ function Row({ it, busy, onPick, onConfirm, onConfirmChange, onChangeTime, onRat
         <div className="msg">
           <section role="alert" className="card safety">
             <strong className="bad">⚠ Safety first</strong>
-            <span>{it.text}</span>
+            <span>{withCallLinks(it.text)}</span>
           </section>
         </div>
       );

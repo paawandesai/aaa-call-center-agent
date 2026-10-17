@@ -1,6 +1,6 @@
 // Safety probe runner from the 2026-10-17 audit: runs each conversation in a probe file through the real agent
 // (Haiku, seeded mock DB) and appends one JSON line per conversation. Usage, from web/:
-//   DEMO_NOW=2026-10-19T14:00:00Z npx tsx scripts/safety_probes.mts ../eval/safety_probes/probes_reaudit.json out.jsonl [id,id]
+//   MERIDIAN_DATA_DIR=... KB_CHUNKS=... DEMO_NOW=2026-10-19T14:00:00Z npx tsx scripts/safety_probes.mts ../eval/safety_probes/probes_reaudit.json out.jsonl [id,id]
 // Output holds model text, so write it outside the repo.
 import Anthropic from "@anthropic-ai/sdk";
 import fs from "node:fs";
@@ -15,15 +15,16 @@ const { confirmBooking, whenLabel } = await import("../lib/scheduling.ts");
 const { loadSeedFromSqlite } = await import("../lib/seed.ts");
 const { pgliteDb } = await import("../test/pglite.ts");
 const { route } = await import("../lib/policy.ts");
-const { costUsd } = await import("../lib/pricing.ts");
+const { turnCostUsd } = await import("../lib/pricing.ts");
 const { config } = await import("../lib/config.ts");
 
-const data = "/mnt/project-files/data/meridian_dataset";
+const need = (k: string): string => process.env[k] || (() => { throw new Error(`set ${k} (see .env.example)`); })();
+const data = need("MERIDIAN_DATA_DIR");
 const d = await pgliteDb();
 setDb(d);
 await migrate(d);
 await loadSeedFromSqlite(d, path.join(data, "scheduling_db/meridian_scheduling.sqlite"));
-console.error("kb", await loadKb(d, "/mnt/project-files/data/kb/chunks.json"));
+console.error("kb", await loadKb(d, need("KB_CHUNKS")));
 await d.query(`INSERT INTO sessions (session_id, role, expires_at) VALUES ('probe','caller', now() + interval '1 day')`);
 const deps = { db: d, anthropic: new Anthropic({ apiKey: process.env.ANTHROPIC_AEA_API_KEY }), search: (q: string) => searchKb(d, q) };
 
@@ -58,7 +59,7 @@ async function runOne(p: { id: string; cat: string; turns: string[] }) {
         else if (e.type !== "status") events.push(e.type === "safety" ? { type: "safety", script: e.script } : e);
       });
     } catch (e) { r = { outcome: "exception:" + String(e) }; }
-    const cost = r.usage ? costUsd(config.model, r.usage) : 0;
+    const cost = turnCostUsd(config.model, config.safetyModel, r);
     totalCost += cost; tin += r.inputTokens ?? 0; tout += r.outputTokens ?? 0;
     turns.push({ input: t, route: rt.kind === "model" ? "model" : `${rt.kind}:${(rt as any).script ?? (rt as any).reason}/${(rt as any).intent}`,
       outcome: r.outcome, safetyCheck: r.safetyCheck, handoffReason: r.handoffReason, tools: r.toolCalls, events, text, safetyLock: c.safetyLock });

@@ -13,12 +13,13 @@ import { loadSeedFromSqlite } from "../lib/seed";
 import { pgliteDb } from "../test/pglite";
 
 process.env.DEMO_NOW ??= "2026-10-16T15:00:00Z";
-const data = process.env.MERIDIAN_DATA_DIR ?? "/mnt/project-files/data/meridian_dataset";
+const need = (k: string): string => process.env[k] || (() => { throw new Error(`set ${k} (see .env.example)`); })();
+const data = need("MERIDIAN_DATA_DIR");
 const d = await pgliteDb();
 setDb(d);
 await migrate(d);
 await loadSeedFromSqlite(d, path.join(data, "scheduling_db/meridian_scheduling.sqlite"));
-console.log("kb chunks", await loadKb(d, process.env.KB_CHUNKS ?? "/mnt/project-files/data/kb/chunks.json"));
+console.log("kb chunks", await loadKb(d, need("KB_CHUNKS")));
 await d.query(`INSERT INTO sessions (session_id, role, expires_at) VALUES ('smoke','caller', now() + interval '1 day')`);
 const deps = { db: d, anthropic: new Anthropic({ apiKey: process.env.ANTHROPIC_AEA_API_KEY }), search: (q: string) => searchKb(d, q) };
 

@@ -36,7 +36,7 @@ export function ReviewForm({ turnId, flag }: { turnId: string; flag: string }) {
         <textarea id="note" rows={2} maxLength={400} value={note} onChange={(e) => setNote(e.target.value)} style={{ padding: 8, maxWidth: 560 }}
           placeholder="What should change? No customer details." />
       </div>
-      <label style={{ display: "inline-flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={reg} onChange={(e) => setReg(e.target.checked)} />Add this conversation to the regression tests</label>
+      <label style={{ display: "inline-flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={reg} onChange={(e) => setReg(e.target.checked)} />Mark for the regression set (a person writes a synthetic case for it; no chat text is stored)</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
         <button type="submit" className="btn btn-primary">Save review</button>
         <span className="small muted" style={{ maxWidth: 520 }}>Saving records a proposal. Fixes ship through a reviewed code or content change and a fresh eval run, never automatically.</span>

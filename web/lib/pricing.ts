@@ -12,6 +12,11 @@ export function addUsage(a: Usage, b: Usage): Usage {
   return { input: a.input + b.input, cacheRead: a.cacheRead + b.cacheRead, cacheWrite: a.cacheWrite + b.cacheWrite, output: a.output + b.output };
 }
 
+// A chat turn's cost: the agent's tokens at its model plus the safety check's tokens at SAFETY_MODEL.
+export function turnCostUsd(agentModel: string, safetyModel: string, r: { usage?: Usage; safetyUsage?: Usage }): number {
+  return (r.usage ? costUsd(agentModel, r.usage) : 0) + (r.safetyUsage ? costUsd(safetyModel, r.safetyUsage) : 0);
+}
+
 export function costUsd(model: string, u: Usage): number {
   const p = PRICES[model] ?? PRICES["claude-opus-5-5"];
   return (u.input * p.input + u.cacheWrite * p.input * 1.25 + u.cacheRead * p.cacheRead + u.output * p.output) / 1_000_000;

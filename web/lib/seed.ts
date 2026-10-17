@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { now } from "./config";
 import type { Db, Queryable } from "./db";
 
 type Row = Record<string, unknown>;
@@ -47,19 +48,39 @@ export async function resetLiveTables(d: Db) {
   await d.tx((q) => resetLiveTablesIn(q));
 }
 
+// The partner's schedule covers 2026-10-16 to 11-05. So booking keeps working after that, each reset moves the whole seed
+// forward by whole weeks (weekdays stay put) once Central "today" is a week or more past 2026-10-19. Slot times are rebuilt
+// from Central wall-clock, so DST is still applied by tzdata. Before then, and whenever DEMO_NOW pins the clock, it is 0.
+const SEED_ANCHOR = Date.UTC(2026, 9, 19);
+export function seedOffsetDays(at: Date = now()): number {
+  const [y, m, d] = at.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }).split("-").map(Number);
+  const days = Math.floor((Date.UTC(y, m - 1, d) - SEED_ANCHOR) / 86_400_000);
+  return days > 0 ? 7 * Math.floor(days / 7) : 0;
+}
+
 export async function resetLiveTablesIn(q: Queryable) {
+  const off = seedOffsetDays();
   await q.query(`TRUNCATE invoices, appointments, appointment_slots, customers RESTART IDENTITY CASCADE`);
   await q.query(`INSERT INTO customers (customer_id,name,phone,email,service_address,city,zip,membership_tier,membership_renewal_date,system_brand,system_install_date)
-    SELECT customer_id,name,phone,email,service_address,city,zip,membership_tier,membership_renewal_date,system_brand,system_install_date FROM seed_customers`);
-  await q.query(`INSERT INTO appointment_slots SELECT * FROM seed_appointment_slots`);
+    SELECT customer_id,name,phone,email,service_address,city,zip,membership_tier,membership_renewal_date + $1::int,system_brand,system_install_date
+    FROM seed_customers`, [off]);
+  await q.query(`INSERT INTO appointment_slots (slot_id, slot_date, "window", tech_id, zone, service_type, status, tz, start_utc, end_utc)
+    SELECT slot_id, slot_date + $1::int, "window", tech_id, zone, service_type, status, tz,
+      (slot_date + $1::int + split_part("window", '-', 1)::time) AT TIME ZONE 'America/Chicago',
+      (slot_date + $1::int + split_part("window", '-', 2)::time) AT TIME ZONE 'America/Chicago'
+    FROM seed_appointment_slots`, [off]);
   // The seed already contains overlapping appointments (audit F1). The overlap trigger guards new bookings only.
   await q.query(`ALTER TABLE appointments DISABLE TRIGGER appointments_no_overlap`);
   await q.query(`INSERT INTO appointments (appointment_id, slot_id, customer_id, issue_description, created_at, status, is_warranty_visit)
-    SELECT appointment_id, slot_id, customer_id, issue_description, created_at, status, is_warranty_visit FROM seed_appointments`);
+    SELECT appointment_id, slot_id, customer_id, issue_description, created_at + make_interval(days => $1::int), status, is_warranty_visit
+    FROM seed_appointments`, [off]);
   await q.query(`ALTER TABLE appointments ENABLE TRIGGER appointments_no_overlap`);
   await q.query(`SELECT setval(pg_get_serial_sequence('appointments','appointment_id'), (SELECT coalesce(max(appointment_id),1) FROM appointments))`);
-  await q.query(`INSERT INTO invoices SELECT * FROM seed_invoices`);
+  await q.query(`INSERT INTO invoices (invoice_id, customer_id, appointment_id, issued_date, due_date, amount_cents, balance_cents, line_items)
+    SELECT invoice_id, customer_id, appointment_id, issued_date + $1::int, due_date + $1::int, amount_cents, balance_cents, line_items
+    FROM seed_invoices`, [off]);
   await q.query(`DELETE FROM sessions WHERE expires_at < now()`);
   await q.query(`DELETE FROM events WHERE ts < now() - interval '30 days'`);
   await q.query(`INSERT INTO app_meta VALUES ('last_reset', now()::text) ON CONFLICT (key) DO UPDATE SET value = excluded.value`);
+  await q.query(`INSERT INTO app_meta VALUES ('seed_offset_days', $1) ON CONFLICT (key) DO UPDATE SET value = excluded.value`, [String(off)]);
 }

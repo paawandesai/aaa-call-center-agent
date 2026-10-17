@@ -15,7 +15,10 @@ export async function POST(req: Request) {
   if (!allow(`fb:${s.id}`, 30, 60_000).ok || !allow(`fbip:${clientIp(req)}`, 60, 60_000).ok) return new Response(null, { status: 429 });
   const b = Body.safeParse(await req.json().catch(() => null));
   if (!b.success) return new Response(null, { status: 400 });
-  await db().query(`INSERT INTO feedback (session_id, turn_id, rating, category) VALUES ($1,$2,$3,$4)`,
+  // Only a turn this session actually had can be rated, and once: a repeat post changes the rating.
+  await db().query(`INSERT INTO feedback (session_id, turn_id, rating, category)
+      SELECT $1, $2, $3, $4 WHERE EXISTS (SELECT 1 FROM events WHERE session_id = $1 AND turn_id = $2 AND kind = 'turn')
+      ON CONFLICT (session_id, turn_id) DO UPDATE SET rating = excluded.rating, category = excluded.category, created_at = now()`,
     [s.id, b.data.turn_id, b.data.rating, b.data.category ?? null]);
   return new Response(null, { status: 204 });
 }

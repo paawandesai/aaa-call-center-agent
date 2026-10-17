@@ -6,11 +6,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "../lib/db";
 import { migrate } from "../lib/migrate";
 import { findSlots } from "../lib/scheduling";
-import { loadSeedFromSqlite } from "../lib/seed";
+import { loadSeedFromSqlite, resetLiveTables, seedOffsetDays } from "../lib/seed";
 import { pgliteDb } from "./pglite";
 
 // The DST and double-booking checks on a tiny synthetic database built here, so they run in CI without the partner's data.
-process.env.DEMO_NOW = "2026-10-16T14:00:00Z";
 
 function buildFixture(file: string) {
   const s = new DatabaseSync(file);
@@ -58,5 +57,21 @@ describe("scheduling on a synthetic fixture", () => {
 
   it("rejects an overlapping booking at the database level", async () => {
     await expect(d.query(`INSERT INTO appointments (slot_id, customer_id) VALUES (4, 'FIX-1')`)).rejects.toMatchObject({ code: "23P01" });
+  });
+
+  it("rolls the schedule forward by whole weeks once it would run out, rebuilding times for DST", async () => {
+    expect(seedOffsetDays(new Date("2026-10-25T12:00:00Z"))).toBe(0);
+    expect(seedOffsetDays(new Date("2026-10-26T12:00:00Z"))).toBe(7);
+    process.env.DEMO_NOW = "2026-11-25T15:00:00Z";
+    try {
+      await resetLiveTables(d);
+      const { rows } = await d.query<{ day: string; dow: number; t: string }>(`SELECT to_char(slot_date,'YYYY-MM-DD') AS day,
+        extract(isodow FROM slot_date)::int AS dow, to_char(start_utc AT TIME ZONE 'UTC','HH24:MI') AS t FROM appointment_slots WHERE slot_id = 1`);
+      expect(rows[0]).toEqual({ day: "2026-12-04", dow: 5, t: "14:00" }); // a Friday still, now on standard time
+      expect((await findSlots(d, { zone: "central", service_type: "hvac_repair" })).map((s) => s.slot_id)).toContain(1);
+    } finally {
+      process.env.DEMO_NOW = "2026-10-16T14:00:00Z";
+      await resetLiveTables(d);
+    }
   });
 });

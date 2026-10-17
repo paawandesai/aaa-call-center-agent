@@ -8,7 +8,9 @@ let extractor: Promise<Extractor> | undefined;
 async function load(): Promise<Extractor> {
   const tf = await import("@huggingface/transformers");
   tf.env.cacheDir = process.env.MODEL_CACHE_DIR ?? path.join(process.cwd(), ".models");
-  return (await tf.pipeline("feature-extraction", config.embedModel, { dtype: "fp32" })) as unknown as Extractor;
+  // The build downloads the model (scripts/warm_model.ts); the running server only reads that local copy.
+  if (process.env.NEXT_RUNTIME) tf.env.allowRemoteModels = false;
+  return (await tf.pipeline("feature-extraction", config.embedModel, { dtype: "fp32", revision: config.embedRevision })) as unknown as Extractor;
 }
 
 export async function embed(texts: string[]): Promise<number[][]> {

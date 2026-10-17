@@ -6,7 +6,7 @@ const sans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], 
 const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: "Meridian automated assistant (demo)",
+  title: { default: "Meridian automated assistant (demo)", template: "%s · Meridian demo" },
   description: "Prototype AI call center assistant for a fictional HVAC and plumbing company.",
   robots: { index: false, follow: false },
 };

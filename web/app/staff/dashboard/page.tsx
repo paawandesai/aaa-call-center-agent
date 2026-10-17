@@ -7,6 +7,7 @@ import { requireSession } from "@/lib/session";
 import { REASON_LABEL, shortId } from "@/lib/staffcopy";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Live traffic" };
 
 // Everything here comes from first-party metadata (no chat text). This page never calls the model.
 const RANGES: [string, string, number][] = [["24h", "24 h", 1], ["7d", "7 days", 7], ["30d", "30 days", 30]];
@@ -14,36 +15,41 @@ const INTENDED = new Set(["safety", "billing_account", "cancel_reschedule", "com
 const fmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const when = (d: Date | string | null) => (d ? fmt.format(new Date(d)) : "never");
 
-export default async function Dashboard({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ range?: string; demo?: string }> }) {
   if (!(await requireSession("staff"))) redirect("/");
   const q = db();
-  const want = (await searchParams).range;
+  const sp = await searchParams;
+  const want = sp.range;
+  // Synthetic demo activity (lib/demoseed.ts, session ids "demo_...") is left out unless staff ask for it.
+  const showDemo = sp.demo === "1";
+  const real = showDemo ? "" : `AND coalesce(session_id, '') NOT LIKE 'demo\\_%'`;
   const range = RANGES.find(([id]) => id === want) ?? RANGES[1];
   const days = range[2];
   const conv = `coalesce(meta->>'conversation', session_id)`;
   const k = (await q.query<{ convs: number; handed: number; turns: number; errors: number; p50: number | null; p95: number | null }>(`
     WITH c AS (SELECT ${conv} AS c, bool_or(outcome IN ('handoff','safety')) AS handed FROM events
-      WHERE kind = 'turn' AND ts > now() - make_interval(days => $1) GROUP BY 1)
+      WHERE kind = 'turn' AND ts > now() - make_interval(days => $1) ${real} GROUP BY 1)
     SELECT (SELECT count(*)::int FROM c) AS convs, (SELECT count(*)::int FROM c WHERE handed) AS handed,
       count(*)::int AS turns, count(*) FILTER (WHERE outcome = 'error')::int AS errors,
       percentile_cont(0.5) WITHIN GROUP (ORDER BY first_token_ms) AS p50,
       percentile_cont(0.95) WITHIN GROUP (ORDER BY first_token_ms) AS p95
-    FROM events WHERE kind = 'turn' AND ts > now() - make_interval(days => $1)`, [days])).rows[0];
-  const failedBookings = (await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM events WHERE kind = 'booking' AND outcome <> 'booked' AND ts > now() - make_interval(days => $1)`, [days])).rows[0].n;
+    FROM events WHERE kind = 'turn' AND ts > now() - make_interval(days => $1) ${real}`, [days])).rows[0];
+  const failedBookings = (await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM events WHERE kind = 'booking' AND outcome <> 'booked' AND ts > now() - make_interval(days => $1) ${real}`, [days])).rows[0].n;
   const reasons = (await q.query<{ reason: string; n: number }>(`SELECT reason, count(DISTINCT ${conv})::int AS n FROM events
-    WHERE kind = 'turn' AND reason IS NOT NULL AND ts > now() - make_interval(days => $1) GROUP BY 1 ORDER BY 2 DESC`, [days])).rows;
+    WHERE kind = 'turn' AND reason IS NOT NULL AND ts > now() - make_interval(days => $1) ${real} GROUP BY 1 ORDER BY 2 DESC`, [days])).rows;
   const perDay = (await q.query<{ day: string; contained: number; handed: number }>(`
     WITH c AS (SELECT ${conv} AS c, min(ts) AS ts, bool_or(outcome IN ('handoff','safety')) AS handed FROM events
-      WHERE kind = 'turn' AND ts > now() - make_interval(days => $1) GROUP BY 1)
+      WHERE kind = 'turn' AND ts > now() - make_interval(days => $1) ${real} GROUP BY 1)
     SELECT to_char(date_trunc('day', ts AT TIME ZONE 'America/Chicago'), 'YYYY-MM-DD') AS day,
       count(*) FILTER (WHERE NOT handed)::int AS contained, count(*) FILTER (WHERE handed)::int AS handed
     FROM c GROUP BY 1 ORDER BY 1`, [days])).rows;
   const failures = (await q.query<{ ts: Date; session_id: string | null; kind: string; outcome: string; reason: string | null }>(`
     SELECT ts, session_id, kind, outcome, reason FROM events
-    WHERE (kind = 'turn' AND (outcome = 'error' OR reason = 'booking_failed')) OR (kind = 'booking' AND outcome <> 'booked') OR kind = 'rate_limit'
-    ORDER BY ts DESC LIMIT 8`)).rows;
+    WHERE ((kind = 'turn' AND (outcome = 'error' OR reason = 'booking_failed')) OR (kind = 'booking' AND outcome <> 'booked') OR kind IN ('rate_limit', 'capacity'))
+      AND ts > now() - make_interval(days => $1) ${real}
+    ORDER BY ts DESC LIMIT 8`, [days])).rows;
   const health = (await q.query<{ last_reply: Date | null; chunks: number; embed: string | null; last_reset: string | null }>(`
-    SELECT (SELECT max(ts) FROM events WHERE kind = 'turn' AND outcome <> 'error' AND coalesce(output_tokens, 0) > 0) AS last_reply,
+    SELECT (SELECT max(ts) FROM events WHERE kind = 'turn' AND outcome <> 'error' AND coalesce(output_tokens, 0) > 0 AND coalesce(session_id, '') NOT LIKE 'demo\\_%') AS last_reply,
       (SELECT count(*)::int FROM kb_chunks) AS chunks, (SELECT min(embed_model) FROM kb_chunks) AS embed,
       (SELECT value FROM app_meta WHERE key = 'last_reset') AS last_reset`)).rows[0];
   const waiting = await openHandoffCount(q);
@@ -57,7 +63,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const W = 640, H = 200, base = 180, slot = W / Math.max(perDay.length, 7), bw = Math.min(48, slot * 0.6);
   const y = (n: number) => (n / maxDay) * 160;
   const failKind = (f: (typeof failures)[number]) =>
-    f.kind === "rate_limit" ? ["Rate limit hit", "429"] : f.kind === "booking" ? [f.outcome === "slot_taken" ? "Slot taken at confirm" : f.outcome === "cap_reached" ? "Booking cap reached" : "Booking error", f.outcome === "slot_taken" ? "409 · offered next slot" : f.outcome === "cap_reached" ? "429" : "500"]
+    f.kind === "rate_limit" ? ["Rate limit hit", "429"] : f.kind === "capacity" ? ["Daily spend cap reached", "turn refused"] : f.kind === "booking" ? [f.outcome === "slot_taken" ? "Slot taken at confirm" : f.outcome === "cap_reached" ? "Booking cap reached" : "Booking error", f.outcome === "slot_taken" ? "409 · offered next slot" : f.outcome === "cap_reached" ? "429" : "500"]
       : f.reason === "booking_failed" ? ["Booking failed", "handed off"] : ["Model or tool error", "500 · retry offered"];
 
   return (
@@ -67,18 +73,22 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
           <h1 className="h1">Live traffic</h1>
           <nav className="seg" aria-label="Time range">
-            {RANGES.map(([id, label]) => <a key={id} href={`?range=${id}`} aria-current={range[0] === id ? "true" : undefined}>{label}</a>)}
+            {RANGES.map(([id, label]) => <a key={id} href={`?range=${id}${showDemo ? "&demo=1" : ""}`} aria-current={range[0] === id ? "true" : undefined}>{label}</a>)}
           </nav>
         </div>
-        <p className="muted small" style={{ margin: 0 }}>Includes synthetic demo activity, regenerated nightly, so the console has something to show. Real chats are counted alongside it.</p>
+        <p className="muted small" style={{ margin: 0 }}>
+          {showDemo
+            ? <>Showing real chats <strong>plus synthetic demo activity</strong> (made up nightly so the console has something to show). Every number below includes it. <a href={`?range=${range[0]}`}>Show real chats only</a></>
+            : <>Real chats only. <a href={`?range=${range[0]}&demo=1`}>Include synthetic demo activity</a></>}
+        </p>
         {thin && <p className="muted" style={{ margin: 0 }}>Fewer than 20 conversations in this range, so treat these rates as too few to judge.</p>}
 
         <div className="tiles">
-          <div className={`tile${thin ? " thin" : ""}`}><span className="label">Conversations</span><span className="value">{k.convs}</span><span className="small muted">{k.turns} turns · chat only (voice is not built)</span></div>
+          <div className={`tile${thin ? " thin" : ""}`}><span className="label">Conversations{showDemo ? " (incl. demo)" : ""}</span><span className="value">{k.convs}</span><span className="small muted">{k.turns} turns · chat only (voice is not built)</span></div>
           <div className={`tile${thin ? " thin" : ""}`}><span className="label">Contained (live, unverified)</span><span className="value">{pct(k.convs - k.handed)}</span><span className="small muted">No handoff. The graded number is on <a href="/evaluation">Evaluation</a>.</span></div>
           <div className={`tile${thin ? " thin" : ""}`}><span className="label">Handed off</span><span className="value">{pct(k.handed)}</span><span className="small muted">{waiting} waiting now</span></div>
           <div className="tile"><span className="label">Failures</span><span className="value">{k.errors + failedBookings}</span><span className="small muted">Model or tool errors, failed bookings</span></div>
-          <div className="tile"><span className="label">First reply · p50 / p95</span><span className="value">{k.p50 != null ? `${(k.p50 / 1000).toFixed(1)}s / ${((k.p95 ?? 0) / 1000).toFixed(1)}s` : "–"}</span><span className="small muted">Time to first streamed word</span></div>
+          <div className="tile"><span className="label">First reply · p50 / p95{showDemo ? " (incl. demo)" : ""}</span><span className="value">{k.p50 != null ? `${(k.p50 / 1000).toFixed(1)}s / ${((k.p95 ?? 0) / 1000).toFixed(1)}s` : "–"}</span><span className="small muted">Time to first streamed word</span></div>
         </div>
 
         <div className="row-wrap">
@@ -137,11 +147,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <h2 id="t3" className="h2">System health</h2>
             <table>
               <tbody>
-                <tr><td>Database</td><td className="ok">● Connected</td><td className="mono muted" style={{ textAlign: "right" }}>{when(new Date())}</td></tr>
+                <tr><td>Database</td><td className="ok">● Answered this page load</td><td /></tr>
                 <tr><td>Last successful model reply</td><td className={health.last_reply ? "ok" : "muted"}>{health.last_reply ? "● OK" : "No replies yet"}</td><td className="mono muted" style={{ textAlign: "right" }}>{when(health.last_reply)}</td></tr>
                 <tr><td>Knowledge index</td><td>{health.chunks} chunks · {health.embed ?? "–"}</td><td /></tr>
                 <tr><td>Nightly reset and purge</td><td className={resetOk ? "ok" : "bad"}>{resetOk ? "● Ran on schedule" : "▲ Missed last run"}</td><td className="mono muted" style={{ textAlign: "right" }}>{when(health.last_reset)}</td></tr>
-                <tr><td>Model spend today</td><td>${spend.usd.toFixed(2)} of ${spend.cap.toFixed(2)} cap</td><td className="small muted" style={{ textAlign: "right" }}>estimate since last restart</td></tr>
+                <tr><td>Model spend today</td><td>${spend.usd.toFixed(2)} of ${spend.cap.toFixed(2)} cap</td><td className="small muted" style={{ textAlign: "right" }}>estimate · day resets 00:00 UTC</td></tr>
               </tbody>
             </table>
             <span className="small muted">Read from stored timestamps. This page never calls the model.</span>

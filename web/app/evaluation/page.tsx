@@ -1,3 +1,4 @@
+import { config } from "@/lib/config";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { redirect } from "next/navigation";
@@ -7,6 +8,7 @@ import { openHandoffCount } from "@/lib/handoffs";
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Evaluation" };
 
 // Reads the committed results JSON. This page never runs the eval or calls the model.
 interface Rate { k: number; n: number; rate: number; ci: [number, number] }
@@ -51,6 +53,7 @@ export default async function Evaluation() {
   const nav = <StaffNav current="/evaluation" waiting={waiting} staff={staff} />;
   if (!r) return <>{nav}<main className="page"><h1 className="h1">How we measured</h1><p>No evaluation run has been committed yet.</p></main></>;
   const x = (v: number) => Math.min(1000, Math.max(0, v * 1000));
+  const same = Math.abs(r.containment.rate - r.ceiling.rate) < 0.005;
   return (
     <>
       {nav}
@@ -58,7 +61,7 @@ export default async function Evaluation() {
         <div className="stack-8" style={{ maxWidth: 760 }}>
           <span className="label">Eval run {r.run_id} · {r.created_at.slice(0, 10)} · config {r.config_id} · prompt {r.prompt_version}</span>
           <h1 className="h1">How well the assistant does on held-out calls</h1>
-          <p className="muted" style={{ margin: 0 }}>The test set is {r.split}, held out before call-driver discovery; each caller's opening line is verbatim from the redacted transcript, and a simulated caller answers the follow-up questions. Each item is scored by code against facts from the current knowledge base. No AI grades the AI. These numbers are for prompt {r.prompt_version}; later prompts have been measured on the dev set only (see the README).</p>
+          <p className="muted" style={{ margin: 0 }}>The test set is {r.split}, held out before call-driver discovery; each caller's opening line is verbatim from the redacted transcript, and a simulated caller answers the follow-up questions. Each item is scored by code against facts from the current knowledge base. No AI grades the AI. These numbers are for prompt {r.prompt_version}. The deployed prompt is {config.promptVersion}, which has been measured on the dev set and the adversarial set only (see the README).</p>
           {r.note && <p style={{ margin: 0 }}>{r.note}</p>}
         </div>
 
@@ -76,9 +79,9 @@ export default async function Evaluation() {
             <text x={(x(r.target[0]) + x(r.target[1])) / 2} y="16" textAnchor="middle" fontSize="12" fill="var(--ink-muted)" fontFamily="var(--font-mono)">target</text>
             <rect x={x(r.containment.ci[0])} y="28" width={x(r.containment.ci[1]) - x(r.containment.ci[0])} height="4" fill="var(--accent)" opacity="0.4" />
             <rect x={x(r.containment.rate) - 2} y="18" width="4" height="24" fill="var(--accent)" />
-            <text x={x(r.containment.rate)} y="12" textAnchor="middle" fontSize="12" fill="var(--accent-ink)" fontFamily="var(--font-mono)">measured</text>
+            <text x={x(r.containment.rate)} y="12" textAnchor="middle" fontSize="12" fill="var(--accent-ink)" fontFamily="var(--font-mono)">{same ? "measured = ceiling" : "measured"}</text>
             <line x1={x(r.ceiling.rate)} y1="18" x2={x(r.ceiling.rate)} y2="42" stroke="var(--ink)" strokeWidth="2" strokeDasharray="3 2" />
-            <text x={x(r.ceiling.rate)} y="56" textAnchor="middle" fontSize="12" fill="var(--ink)" fontFamily="var(--font-mono)">ceiling</text>
+            {!same && <text x={x(r.ceiling.rate)} y="56" textAnchor="middle" fontSize="12" fill="var(--ink)" fontFamily="var(--font-mono)">ceiling</text>}
             <text x="0" y="56" fontSize="12" fill="var(--ink-muted)" fontFamily="var(--font-mono)">0%</text>
             <text x="1000" y="56" textAnchor="end" fontSize="12" fill="var(--ink-muted)" fontFamily="var(--font-mono)">100%</text>
           </svg>
@@ -88,8 +91,8 @@ export default async function Evaluation() {
         <div className="tiles" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
           <section className="tile"><span className="label">Accuracy on handled drivers</span><span className="value">{pct(r.accuracy.rate)}</span><span className="small muted">Right outcome, required facts present, no stale values · {ci(r.accuracy)}</span></section>
           <section className="tile"><span className="label">Escalation precision / recall</span><span className="value">{pct(r.escalation.precision.rate)} / {pct(r.escalation.recall.rate)}</span><span className="small muted">Handed off when it should ({r.escalation.recall.k} of {r.escalation.recall.n}), and only then ({r.escalation.precision.k} of {r.escalation.precision.n})</span></section>
-          {r.retrieval && <section className="tile"><span className="label">Retrieval · recall@5</span><span className="value">{pct(r.retrieval.hit5.rate)}</span><span className="small muted">Measured on its own, before answers · MRR {r.retrieval.mrr.toFixed(2)} · {ci(r.retrieval.hit5)}</span></section>}
-          <section className="tile"><span className="label">Adversarial set</span><span className="value">{r.adversarial.k} of {r.adversarial.n} held</span><span className="small muted">Injection, bulk booking, other callers&apos; data, repeated asks for a person{r.probes ? ` · KB probes ${r.probes.k} of ${r.probes.n}` : ""}</span></section>
+          {r.retrieval && <section className="tile"><span className="label">Retrieval · recall@5</span><span className="value">{pct(r.retrieval.hit5.rate)}</span><span className="small muted">Dev set, n={r.retrieval.hit5.n}, not the held-out calls · measured on its own, before answers · MRR {r.retrieval.mrr.toFixed(2)} · {ci(r.retrieval.hit5)}</span></section>}
+          <section className="tile"><span className="label">Adversarial set</span><span className="value">{r.adversarial.k} of {r.adversarial.n} held</span><span className="small muted">Prompt {r.prompt_version}, before the set grew; the README has the deployed prompt&apos;s run · injection, bulk booking, other callers&apos; data, repeated asks for a person{r.probes ? ` · KB probes ${r.probes.k} of ${r.probes.n}` : ""}</span></section>
           <section className="tile"><span className="label">Safety calls</span><span className="value">{r.safety.k} of {r.safety.n}</span><span className="small muted">Safety script shown and handed off, never booked</span></section>
         </div>
 

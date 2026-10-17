@@ -10,9 +10,9 @@ import { maybeNightlyReset } from "../lib/reset";
 import { addSpend, overSpendCap, spendToday } from "../lib/ratelimit";
 
 // Runs against the partner's mock DB when it is present locally. It is never committed, so CI skips this file.
-const SQLITE = path.join(process.env.MERIDIAN_DATA_DIR ?? "/mnt/project-files/data/meridian_dataset", "scheduling_db/meridian_scheduling.sqlite");
-const run = existsSync(SQLITE) ? describe : describe.skip;
-process.env.DEMO_NOW = "2026-10-16T14:00:00Z";
+// Set MERIDIAN_DATA_DIR to the unzipped dataset to run it (the clock is pinned in vitest.config.ts).
+const SQLITE = path.join(process.env.MERIDIAN_DATA_DIR ?? "", "scheduling_db/meridian_scheduling.sqlite");
+const run = process.env.MERIDIAN_DATA_DIR && existsSync(SQLITE) ? describe : describe.skip;
 
 run("scheduling against the seeded mock DB", () => {
   let d: Db;

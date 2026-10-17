@@ -21,16 +21,28 @@ import { changeAppointment } from "../lib/accounts";
 import { addUsage, costUsd, emptyUsage, type Usage } from "../lib/pricing";
 import { pgliteDb } from "../test/pglite";
 
-process.env.DEMO_NOW ??= "2026-10-16T15:00:00Z";
+process.env.DEMO_NOW ||= "2026-10-16T15:00:00Z"; // ||= so an empty DEMO_NOW= from a sourced .env is replaced too
 const args = process.argv.slice(2);
+const USAGE = `usage: npm run eval -- [--split holdout|dev] [--only holdout|adversarial] [--limit N]
+  --split   which case set: the September holdout (default, for reported results) or the July-August dev set (for tuning)
+  --only    run just the split's cases ("holdout") or just the synthetic adversarial set ("adversarial"); default both
+  --limit   stop after N cases of each set
+Real model calls (ANTHROPIC_AEA_API_KEY). A full holdout run overwrites eval/results/containment_holdout.json.`;
+const FLAGS = new Set(["--split", "--only", "--limit"]);
+for (let i = 0; i < args.length; i += 2) {
+  if (!FLAGS.has(args[i]) || args[i + 1] === undefined) { console.error(args[i] === "--help" || args[i] === "-h" ? USAGE : `unknown or incomplete option "${args[i]}"\n${USAGE}`); process.exit(args[i] === "--help" || args[i] === "-h" ? 0 : 2); }
+}
 const limit = args.includes("--limit") ? Number(args[args.indexOf("--limit") + 1]) : Infinity;
 const only = args.includes("--only") ? args[args.indexOf("--only") + 1] : "";
+if (only && !["holdout", "adversarial"].includes(only)) throw new Error("--only must be holdout or adversarial");
+if (!(limit > 0)) throw new Error("--limit must be a positive number");
 // --split dev tunes on July-August discovery calls; the September holdout is for reported results only.
 const split = args.includes("--split") ? args[args.indexOf("--split") + 1] : "holdout";
 if (!["holdout", "dev"].includes(split)) throw new Error("--split must be holdout or dev");
 const REPO = path.resolve(process.cwd(), "..");
-const DATA = process.env.MERIDIAN_DATA_DIR ?? "/mnt/project-files/data/meridian_dataset";
-const EVAL_DIR = process.env.MERIDIAN_EVAL_DIR ?? "/mnt/project-files/data/eval";
+const need = (k: string): string => process.env[k] || (() => { throw new Error(`set ${k} (see .env.example)`); })();
+const DATA = need("MERIDIAN_DATA_DIR");
+const EVAL_DIR = need("MERIDIAN_EVAL_DIR");
 
 type Outcome = "safety" | "handoff" | "booked" | "answered" | "changed" | "confirm_pending" | "error";
 interface Trace { outcome: Outcome; reason?: string; texts: string[]; events: AgentEvent[]; booked?: { service: string }; changed?: { action: string }; inTok: number; outTok: number; usage: Usage; turns: number; offered: Set<number>; pendingSlot?: number }
@@ -48,7 +60,7 @@ const d = await pgliteDb();
 setDb(d);
 await migrate(d);
 await loadSeedFromSqlite(d, path.join(DATA, "scheduling_db/meridian_scheduling.sqlite"));
-await loadKb(d, process.env.KB_CHUNKS ?? "/mnt/project-files/data/kb/chunks.json");
+await loadKb(d, need("KB_CHUNKS"));
 const deps = { db: d, anthropic: new Anthropic({ apiKey: process.env.ANTHROPIC_AEA_API_KEY, maxRetries: 4 }), search: (q: string) => searchKb(d, q) };
 
 const SERVICE_OF: Record<string, ServiceType> = { "Heating or cooling repair": "hvac_repair", "Seasonal tune-up": "hvac_tune_up", "Plumbing visit": "plumbing", "Replacement estimate": "estimate" };
@@ -95,7 +107,7 @@ async function converse(id: string, turns: string[], sim?: Sim): Promise<Trace> 
     let reply = "";
     const r = await runTurn(deps, c, text, (e) => { if (e.type === "text_delta") reply += e.text; else if (e.type === "text_discard") reply = reply.slice(0, reply.length - e.chars); else t.events.push(e); });
     t.texts.push(reply);
-    t.inTok += r.inputTokens; t.outTok += r.outputTokens; t.usage = addUsage(t.usage, r.usage);
+    t.inTok += r.inputTokens; t.outTok += r.outputTokens; t.usage = addUsage(addUsage(t.usage, r.usage), r.safetyUsage ?? emptyUsage()); // same price while SAFETY_MODEL = AGENT_MODEL
     for (const s of c.offered.keys()) t.offered.add(s);
     // The chosen slot was taken before the card appeared: the simulated caller picks again from the new options.
     if (t.events.slice(before).some((e) => e.type === "booking_failed")) t.pendingSlot = undefined;

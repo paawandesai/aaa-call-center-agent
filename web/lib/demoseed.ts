@@ -79,7 +79,7 @@ export async function seedDemoActivity(q: Queryable, now = new Date()) {
     await q.query(`INSERT INTO events (ts, session_id, turn_id, kind, intent, outcome, reason, latency_ms, first_token_ms, input_tokens, output_tokens, top_score, meta) VALUES ${values}`, chunk.flat());
   }
   for (const [session, turnId, ts] of downTurns.slice(0, 3)) {
-    await q.query(`INSERT INTO feedback (created_at, session_id, turn_id, rating) VALUES ($1,$2,$3,'down')`, [ts, session, turnId]);
+    await q.query(`INSERT INTO feedback (created_at, session_id, turn_id, rating) VALUES ($1,$2,$3,'down') ON CONFLICT DO NOTHING`, [ts, session, turnId]);
   }
   const ids: number[] = [];
   for (const h of HANDOFFS) {

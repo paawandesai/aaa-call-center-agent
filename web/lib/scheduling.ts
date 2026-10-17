@@ -18,7 +18,8 @@ export const FEE_LABEL: Record<ServiceType, string> = {
   estimate: "Free in-home estimate",
 };
 // Holiday closures from the 2026 holiday hours notice. No regular appointments on these dates.
-// Full closures from the holiday hours image. Its shortened Christmas Eve hours are not modelled: the mock schedule ends 2026-11-05.
+// Full closures from the holiday hours image. Its shortened Christmas Eve hours are not modelled. The mock schedule rolls
+// forward weekly (lib/seed.ts), so these dates can come into range.
 const CLOSED_DATES = ["2026-11-26", "2026-11-27", "2026-12-25", "2027-01-01"];
 const LEAD_MINUTES = 120;
 

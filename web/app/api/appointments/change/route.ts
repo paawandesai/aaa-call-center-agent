@@ -22,17 +22,19 @@ const Body = z.object({
 export async function POST(req: Request) {
   const session = await requireSession();
   if (!session) return Response.json({ error: "unauthorized" }, { status: 401 });
-  const parsed = Body.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
-  const b = parsed.data;
   // The demo customers are shared by everyone, so moves and cancellations are also capped per IP and across all visitors
-  // (single instance, counted in memory until a restart).
+  // (single instance, counted in memory until a restart). Limits come before the body is read.
   let rl = allow(`confirm:${session.id}`, 10, 60_000);
   if (rl.ok) rl = allow(`changeip:${clientIp(req)}`, 10, 86_400_000);
   if (rl.ok) rl = allow("changeall", 60, 86_400_000);
   if (!rl.ok) return Response.json({ error: "rate_limited", retry_after_s: rl.retryAfterS }, { status: 429 });
+  const parsed = Body.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
+  const b = parsed.data;
 
   const conv = findConversation(session.id, b.conversation_id);
+  // A retried Confirm (same idempotency key) after a success gets the same answer, not an error.
+  if (conv?.lastChange?.key === b.idempotency_key) return Response.json(conv.lastChange.body);
   const p = conv?.pendingChange;
   if (!conv || !p || !conv.verified || p.customer_id !== conv.verified.customerId || p.appointment_id !== b.appointment_id || p.action !== b.action || conv.safetyLock) {
     return Response.json({ type: "change_failed", reason: "error" }, { status: 409 });
@@ -50,7 +52,9 @@ export async function POST(req: Request) {
     conv.notes.push(result.action === "cancel"
       ? `The caller pressed Confirm and the app cancelled their ${result.service.toLowerCase()} on ${result.old_when_label}. The app already showed them this.`
       : `The caller pressed Confirm and the app moved their ${result.service.toLowerCase()} from ${result.old_when_label} to ${result.when_label}, reference ${result.ref}. The app already showed them this.`);
-    return Response.json({ type: "changed", action: result.action, ref: result.ref, when_label: result.when_label, old_when_label: result.old_when_label, service: result.service });
+    const body = { type: "changed", action: result.action, ref: result.ref, when_label: result.when_label, old_when_label: result.old_when_label, service: result.service };
+    conv.lastChange = { key: b.idempotency_key, body };
+    return Response.json(body);
   }
   if (result.reason === "slot_taken") conv.notes.push("The new time the caller tried to confirm was just taken. Offer to check availability again.");
   if (result.reason === "cap_reached") conv.notes.push("The caller reached the demo limit on bookings and changes per session.");

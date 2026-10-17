@@ -18,7 +18,7 @@ export async function searchKb(q: Queryable, query: string, k = config.retrieval
     `SELECT id, doc, doc_title, section, effective, text,
             1 - (embedding <=> $1::vector) AS score
      FROM kb_chunks WHERE embed_model = $2 ORDER BY embedding <=> $1::vector LIMIT $3`,
-    [v, config.embedModel, k],
+    [v, config.embedTag, k],
   );
   return rows.map((r) => ({ ...r, score: Number(r.score) }));
 }

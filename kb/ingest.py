@@ -22,8 +22,16 @@ import pdfplumber
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from registry import REGISTRY, indexed  # noqa: E402
 
-KB = Path(os.environ.get("MERIDIAN_DATA_DIR", "/mnt/project-files/data/meridian_dataset")) / "knowledge_base"
-OUT = Path(os.environ.get("MERIDIAN_KB_OUT", "/mnt/project-files/data/kb"))
+def _env_path(name: str) -> Path:
+    """A required path from the environment (see .env.example); there is no default, because the data lives outside the repo."""
+    v = os.environ.get(name)
+    if not v:
+        raise SystemExit(f"set {name} (see .env.example)")
+    return Path(v)
+
+
+KB = _env_path("MERIDIAN_DATA_DIR") / "knowledge_base"
+OUT = _env_path("MERIDIAN_KB_OUT")
 
 
 def chunk_id(doc: str, n: int, text: str) -> str:

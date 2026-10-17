@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Chat" };
 
 export default async function ChatPage() {
   const session = await requireSession();

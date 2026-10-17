@@ -13,6 +13,8 @@ export function pgDb(connectionString: string): Db {
   const pool = new pg.Pool({
     connectionString,
     max: 5,
+    // The deployed app reaches Postgres over Railway's private network (no TLS needed). Any other URL is encrypted but
+    // the certificate isn't verified (Railway's public proxy uses one Node can't check), so use that path for local runs only.
     ssl: /sslmode=disable|\.railway\.internal/.test(connectionString) ? false : { rejectUnauthorized: false },
   });
   return {

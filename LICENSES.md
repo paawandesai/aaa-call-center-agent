@@ -155,7 +155,7 @@ LGPL-3.0 entries are sharp's prebuilt libvips binaries: unmodified and dynamical
 | @next/swc-win32-x64-msvc | 16.4.2 | MIT | runtime |
 | @opentelemetry/api | 1.9.1 | Apache-2.0 | runtime |
 | @oxc-project/types | 0.154.0 | MIT | dev |
-| @playwright/test | 1.64.1 | Apache-2.0 | runtime |
+| @playwright/test | 1.64.1 | Apache-2.0 | dev |
 | @protobufjs/aspromise | 1.1.2 | BSD-3-Clause | runtime |
 | @protobufjs/base64 | 1.1.2 | BSD-3-Clause | runtime |
 | @protobufjs/codegen | 2.0.5 | BSD-3-Clause | runtime |
@@ -186,7 +186,7 @@ LGPL-3.0 entries are sharp's prebuilt libvips binaries: unmodified and dynamical
 | @types/chai | 5.2.3 | MIT | dev |
 | @types/deep-eql | 4.0.2 | MIT | dev |
 | @types/estree | 1.0.9 | MIT | dev |
-| @types/node | 22.20.5 | MIT | runtime |
+| @types/node | 22.20.5 | MIT | dev |
 | @types/pg | 8.23.1 | MIT | dev |
 | @types/react | 19.3.0 | MIT | dev |
 | @vitest/mocker | 5.0.5 | MIT | dev |
@@ -253,8 +253,8 @@ LGPL-3.0 entries are sharp's prebuilt libvips binaries: unmodified and dynamical
 | picocolors | 1.1.1 | ISC | runtime |
 | picomatch | 4.0.7 | MIT | dev |
 | platform | 1.3.6 | MIT | runtime |
-| playwright | 1.64.1 | Apache-2.0 | runtime |
-| playwright-core | 1.64.1 | Apache-2.0 | runtime |
+| playwright | 1.64.1 | Apache-2.0 | dev |
+| playwright-core | 1.64.1 | Apache-2.0 | dev |
 | postcss | 8.5.23 | MIT | runtime |
 | postcss | 8.5.30 | MIT | dev |
 | postgres-array | 2.0.0 | MIT | runtime |

@@ -7,6 +7,7 @@ import { requireSession } from "@/lib/session";
 import { REASON_LABEL, REASON_WHY, handoffTitle, waitingLabel } from "@/lib/staffcopy";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Handoff queue" };
 
 interface H { id: number; demo: boolean; created_at: Date; reason: string; intent: string | null; steps_tried: string[]; caller_provided: Record<string, unknown>; slot: unknown; summary: string; status: string }
 

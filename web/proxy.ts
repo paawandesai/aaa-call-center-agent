@@ -2,9 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Only CSP nonce and headers here. Authorization happens in each route handler and server component.
 export function proxy(request: NextRequest) {
-  // API writes: refuse oversized bodies and requests a browser marks as cross-site (cookies are SameSite=Strict too).
-  if (request.method === "POST" && request.nextUrl.pathname.startsWith("/api/")) {
-    if (Number(request.headers.get("content-length") ?? 0) > 32_768) return new NextResponse(null, { status: 413 });
+  // API writes (POST, and DELETE for sign-out): refuse requests a browser marks as cross-site (cookies are SameSite=Strict
+  // too), and POST bodies over 32 KB or with no Content-Length (chunked), so the cap can't be sidestepped.
+  if ((request.method === "POST" || request.method === "DELETE") && request.nextUrl.pathname.startsWith("/api/")) {
+    if (request.method === "POST") {
+      const len = request.headers.get("content-length");
+      if (len === null || Number(len) > 32_768) return new NextResponse(null, { status: len === null ? 411 : 413 });
+    }
     const site = request.headers.get("sec-fetch-site");
     if (site && site !== "same-origin" && site !== "none") return new NextResponse(null, { status: 403 });
   }

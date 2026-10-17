@@ -21,13 +21,14 @@ const Body = z.object({
 export async function POST(req: Request) {
   const session = await requireSession();
   if (!session) return Response.json({ error: "unauthorized" }, { status: 401 });
-  const parsed = Body.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
-  const b = parsed.data;
-  // Sessions are free to create, so the per-session cap alone doesn't stop one visitor filling the schedule.
+  // Limits come before the body is read. Sessions are free to create, so the per-session cap alone doesn't stop one
+  // visitor filling the schedule.
   let rl = allow(`confirm:${session.id}`, 10, 60_000);
   if (rl.ok) rl = allow(`confirmip:${clientIp(req)}`, config.bookingAttemptsPerIpDay, 86_400_000);
   if (!rl.ok) return Response.json({ error: "rate_limited", retry_after_s: rl.retryAfterS }, { status: 429 });
+  const parsed = Body.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
+  const b = parsed.data;
 
   const conv = findConversation(session.id, b.conversation_id);
   // A retried Confirm (same idempotency key) after a success gets the booking back, not an error.

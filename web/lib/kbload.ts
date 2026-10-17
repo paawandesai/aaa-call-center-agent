@@ -20,7 +20,7 @@ export async function loadKb(d: Db, chunksPath: string) {
         `INSERT INTO kb_chunks (id, doc, doc_title, section, effective, kind, text, embed_model, embedding)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::vector)`,
         [c.id, c.doc, title.trim().slice(0, 120), (rest.join(" > ") || (c.kind === "text" ? "" : "Table")).trim().slice(0, 160), c.effective, c.kind, c.text,
-         config.embedModel, toVector(vecs[i])],
+         config.embedTag, toVector(vecs[i])],
       );
     }
   });
