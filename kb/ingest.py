@@ -108,7 +108,7 @@ def parse_png(p: Path) -> tuple[list[tuple[str, str]], dict]:
     return pieces, {"ocr_lines": len(lines) - 1}
 
 
-INSTRUCTION_LIKE = re.compile(r"(?i)\b(ignore (all|previous)|you are now|as an ai|system prompt|ai:|assistant:|always offer|disregard)\b")
+INSTRUCTION_LIKE = re.compile(r"(?i)\b(ignore (all|previous)|you are now|as an ai|system prompt|ai:|assistant:|always offer|disregard|note to (the )?(ai|assistant|model|bot))")
 
 
 def main() -> None:

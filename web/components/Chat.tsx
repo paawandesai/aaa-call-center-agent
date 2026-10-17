@@ -242,7 +242,7 @@ export function Chat({ role = "caller", demoIds = [] }: { role?: "caller" | "sta
               {busy ? <button type="button" className="btn" onClick={() => abort.current?.abort()}>Stop</button>
                 : <button type="submit" className="btn btn-primary" disabled={!draft.trim()}>Send</button>}
             </form>
-            <p className="small muted" style={{ margin: "8px 0 0" }}>Answers are written by AI from Meridian&apos;s current documents and can be wrong. Sources are shown with each answer.</p>
+            <p className="small muted" style={{ margin: "8px 0 0" }}>Answers are written by AI from Meridian&apos;s current documents and can be wrong. Sources are shown with each answer. Messages go to Anthropic&apos;s Claude model; handoffs keep the name and ZIP you gave and a short excerpt for 7 days. Please use made-up details.</p>
           </div>
         </main>
 

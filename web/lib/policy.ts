@@ -15,7 +15,8 @@ import { zipLookup } from "./zones";
 const t = (s: string) => new RegExp(s, "i");
 
 const SAFETY: [RegExp, Route & { kind: "safety" }][] = [
-  [t(String.raw`\b(kill (myself|me)|suicid|end my life|hurt myself|self[- ]harm|don'?t want to (live|be alive))`), { kind: "safety", script: "self_harm", intent: "self_harm" }],
+  // Self-harm phrasing, kept to first-person forms so "this heat is killing me" or "the compressor is going to die" stay out.
+  [t(String.raw`\b(kill(ing)? myself|kill me\b|suicid\w*|end(ing)? (my|it) (own )?life|end(ing)? it all|take (my|my own) life|(hurt|harm|cut)(ing)? myself|self[- ]?harm|i('?m| am)? (just )?(want|wanna|going|gonna|ready) (to )?die\b|i wish i (was|were) dead|(i'?d|i would) be better off dead|better off without me|don'?t want to (live|be alive|be here anymore|wake up)|no (point|reason) (in |to )?(living|live|being alive|going on)|not worth living|i can'?t (go on|do this) any ?more|unalive)`), { kind: "safety", script: "self_harm", intent: "self_harm" }],
   [t(String.raw`\b(smell(s|ing)? (of |like )?(gas|natural gas|propane|rotten eggs?)|gas (smell|leak|odor)|leaking gas|hiss(ing)? .*gas)`), { kind: "safety", script: "gas_co_fire", intent: "gas_leak" }],
   [t(String.raw`\b(carbon monoxide|co (alarm|detector|monitor)|co2? detector (is )?(going off|beeping|alarm))`), { kind: "safety", script: "gas_co_fire", intent: "carbon_monoxide" }],
   [t(String.raw`\b(spark(s|ing)?|smok(e|ing|y)|flames?|on fire|caught fire|electrical fire)\b`), { kind: "safety", script: "gas_co_fire", intent: "sparks_smoke" }],
@@ -23,14 +24,14 @@ const SAFETY: [RegExp, Route & { kind: "safety" }][] = [
 ];
 
 const HANDOFF: [RegExp, HandoffReason, string][] = [
-  [t(String.raw`\b(talk|speak|chat)\s+(to|with)\s+(a\s+|an\s+)?(real\s+|live\s+|actual\s+)?(person|human|agent|rep|representative|someone|somebody|operator|manager|supervisor)|\b(want|need|get|give)\s+(me\s+)?(a\s+)?(real|live)\s+(person|human)\b|\bhuman,? please\b|^\s*(agent|representative|operator)\s*$`), "human_requested", "human_requested"],
+  [t(String.raw`\b(talk|speak|chat)\s+(to|with)\s+(a\s+|an\s+)?(real\s+|live\s+|actual\s+)?(person|human|agent|rep|representative|someone|somebody|operator|manager|supervisor)|\b(want|need|get|give|have)\s+(me\s+)?(a\s+|an\s+)?(real\s+|live\s+|actual\s+)?(human|person|representative|operator|manager|supervisor)\b(?!\s+(to\s+)?(come|look|fix|check|out|over|here|there))|\btransfer\s+(me|us)\b|\bconnect\s+me\s+(to|with)\s+(a\s+|an\s+)?(real\s+|live\s+)?(person|human|representative|rep|agent|operator|someone|somebody|manager|supervisor)\b|\b(human|person|someone|somebody)\s+(i|we)\s+can\s+(talk|speak|chat)\b|\b(human|person|representative|operator|agent),?\s+please\b|^\s*(an?\s+)?(real\s+|live\s+)?(agent|representative|rep|operator|human|person)[.!]*\s*$`), "human_requested", "human_requested"],
   // Verified callers can look up appointments, invoices and renewal dates and move or cancel visits (tools, with a confirm
   // card). Membership cancellations, payments, disputes, refunds and account edits still go to a person.
   [t(String.raw`\bcancel\w*\b.{0,30}\b(membership|comfort club|maintenance plan|auto-?renew\w*)\b`), "billing_account", "membership_cancel"],
-  [t(String.raw`\b(refund|overcharg|double[- ]charg|charged (me )?twice|two .{0,20}charges|dispute|payment plan|pay (my |the |an? )?(bill|invoice|balance)|past due|collections|card on file|autopay|auto-pay|not what i agreed)\b|\bquoted me\b.{0,60}\b(invoice|bill)\b`), "billing_account", "billing"],
+  [t(String.raw`\b(refund\w*|over-?charg\w*|double[- ]?charg\w*|charged (me )?twice|two .{0,20}charges|disput\w*|payment plan|pay (my |the |an? )?(bill|invoice|balance)|past due|collections|card on file|autopay|auto-pay|not what i agreed)\b|\bquoted me\b.{0,60}\b(invoice|bill)\b`), "billing_account", "billing"],
   [t(String.raw`\bupdate my (address|phone|email|card)\b|\b(did|have|has) (you|y'all|you guys|anyone|meridian) (\w+ )?register|\b(unit|system|equipment) (is |was |got )?registered\b`), "billing_account", "account_lookup"],
   [t(String.raw`\bmy window was\b|\bnobody'?s (here|come|shown up|called)\b|\b(no one|nobody) (has )?(came|come|showed|shown) up\b|\b(where is|eta for) (my|the) (tech|technician)\b|\btech(nician)? (never|didn'?t) (show|come)`), "out_of_scope", "tech_late"],
-  [t(String.raw`\b(complain|complaint|terrible|awful|horrible|unacceptable|furious|ripped off|scam|lawsuit|lawyer|attorney|bbb|better business bureau|damaged my|broke my|rude)\b`), "complaint", "complaint"],
+  [t(String.raw`\b(complain\w*|terrible|awful|horrible|unacceptable|furious|ripped off|scam|lawsuit|lawyer|attorney|bbb|better business bureau|damaged my|broke my|rude)\b`), "complaint", "complaint"],
 ];
 
 const ARE_YOU_HUMAN = t(String.raw`\b(are|r) (you|u) (a |an )?(real |actual |live )?(person|human|bot|robot|ai|machine|computer)\b|\bam i (talking|speaking|chatting) (to|with) (a |an )?(real |actual )?(person|human|bot|ai)\b`);
@@ -52,6 +53,8 @@ export const SCRIPTS = {
     "This could be dangerous. If you smell gas, see sparks or smoke, or a carbon monoxide alarm is sounding, leave the house now and call 911 from outside. If it's gas, also call your gas utility's emergency line. Don't flip switches or run the system. I'm passing this to our team right away. I won't book a regular visit for this.",
   self_harm:
     "I'm really sorry you're going through this. You can call or text 988 to reach the Suicide and Crisis Lifeline any time, day or night. If you're in immediate danger, call 911. I'm also letting a person on our team know.",
+  self_harm_followup:
+    "A person on our team has your message. Please call or text 988 any time to talk with someone at the Suicide and Crisis Lifeline, and call 911 if you're in immediate danger.",
   ai_disclosure:
     "I'm an AI, Meridian's automated assistant, not a person. I can answer questions about our services, prices, memberships and warranties, and book a visit. If you'd rather talk to a person, just say so.",
   injection:

@@ -48,6 +48,7 @@ export function whenLabel(date: string, window: string): string {
 const AVAILABLE = `
   s.status = 'open'
   AND s.start_utc > $1
+  AND extract(isodow FROM s.slot_date) <> 7  -- closed Sundays (customer FAQ); the mock data has no Sunday slots today
   AND NOT (to_char(s.slot_date, 'YYYY-MM-DD') = ANY($2::text[]))
   AND NOT EXISTS (
     SELECT 1 FROM appointments a JOIN appointment_slots o ON o.slot_id = a.slot_id

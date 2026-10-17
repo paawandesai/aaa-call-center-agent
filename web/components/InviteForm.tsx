@@ -33,8 +33,11 @@ export function InviteForm() {
       <section aria-labelledby="privacy" style={{ borderTop: "1px solid var(--line)", paddingTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
         <h3 id="privacy" style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Privacy notice</h3>
         <p className="small muted" style={{ margin: 0 }}>
-          Chats are not stored. We keep metadata (timings, outcomes, handoff reasons) for 30 days to measure quality. Handoff summaries
-          have contact details removed. Test bookings are wiped nightly. No third-party analytics run on this site. Please use made-up names.
+          Your messages are sent to Anthropic&apos;s Claude model to write the replies. The conversation itself is held in server memory
+          for up to 2 hours and is not written to the database. What is stored: metadata (timings, outcomes, handoff reasons, no message
+          text) for 30 days; for a handoff, the name and ZIP you gave, an AI-written summary and a 300-character excerpt of your last message
+          (phone numbers and emails masked) for 7 days; for a test booking, the name and issue you gave, until the nightly reset.
+          No third-party analytics run on this site. Please use made-up names.
         </p>
         <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 14, minHeight: 44 }}>
           <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ width: 18, height: 18, margin: "2px 0 0", accentColor: "var(--accent)" }} />

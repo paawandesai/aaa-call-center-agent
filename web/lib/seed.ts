@@ -44,20 +44,22 @@ export async function loadSeedFromSqlite(d: Db, sqlitePath: string) {
 
 // Nightly reset: live scheduling tables go back to the partner's seed; demo customers and bookings disappear.
 export async function resetLiveTables(d: Db) {
-  await d.tx(async (q: Queryable) => {
-    await q.query(`TRUNCATE invoices, appointments, appointment_slots, customers RESTART IDENTITY CASCADE`);
-    await q.query(`INSERT INTO customers (customer_id,name,phone,email,service_address,city,zip,membership_tier,membership_renewal_date,system_brand,system_install_date)
-      SELECT customer_id,name,phone,email,service_address,city,zip,membership_tier,membership_renewal_date,system_brand,system_install_date FROM seed_customers`);
-    await q.query(`INSERT INTO appointment_slots SELECT * FROM seed_appointment_slots`);
-    // The seed already contains overlapping appointments (audit F1). The overlap trigger guards new bookings only.
-    await q.query(`ALTER TABLE appointments DISABLE TRIGGER appointments_no_overlap`);
-    await q.query(`INSERT INTO appointments (appointment_id, slot_id, customer_id, issue_description, created_at, status, is_warranty_visit)
-      SELECT appointment_id, slot_id, customer_id, issue_description, created_at, status, is_warranty_visit FROM seed_appointments`);
-    await q.query(`ALTER TABLE appointments ENABLE TRIGGER appointments_no_overlap`);
-    await q.query(`SELECT setval(pg_get_serial_sequence('appointments','appointment_id'), (SELECT coalesce(max(appointment_id),1) FROM appointments))`);
-    await q.query(`INSERT INTO invoices SELECT * FROM seed_invoices`);
-    await q.query(`DELETE FROM sessions WHERE expires_at < now()`);
-    await q.query(`DELETE FROM events WHERE ts < now() - interval '30 days'`);
-    await q.query(`INSERT INTO app_meta VALUES ('last_reset', now()::text) ON CONFLICT (key) DO UPDATE SET value = excluded.value`);
-  });
+  await d.tx((q) => resetLiveTablesIn(q));
+}
+
+export async function resetLiveTablesIn(q: Queryable) {
+  await q.query(`TRUNCATE invoices, appointments, appointment_slots, customers RESTART IDENTITY CASCADE`);
+  await q.query(`INSERT INTO customers (customer_id,name,phone,email,service_address,city,zip,membership_tier,membership_renewal_date,system_brand,system_install_date)
+    SELECT customer_id,name,phone,email,service_address,city,zip,membership_tier,membership_renewal_date,system_brand,system_install_date FROM seed_customers`);
+  await q.query(`INSERT INTO appointment_slots SELECT * FROM seed_appointment_slots`);
+  // The seed already contains overlapping appointments (audit F1). The overlap trigger guards new bookings only.
+  await q.query(`ALTER TABLE appointments DISABLE TRIGGER appointments_no_overlap`);
+  await q.query(`INSERT INTO appointments (appointment_id, slot_id, customer_id, issue_description, created_at, status, is_warranty_visit)
+    SELECT appointment_id, slot_id, customer_id, issue_description, created_at, status, is_warranty_visit FROM seed_appointments`);
+  await q.query(`ALTER TABLE appointments ENABLE TRIGGER appointments_no_overlap`);
+  await q.query(`SELECT setval(pg_get_serial_sequence('appointments','appointment_id'), (SELECT coalesce(max(appointment_id),1) FROM appointments))`);
+  await q.query(`INSERT INTO invoices SELECT * FROM seed_invoices`);
+  await q.query(`DELETE FROM sessions WHERE expires_at < now()`);
+  await q.query(`DELETE FROM events WHERE ts < now() - interval '30 days'`);
+  await q.query(`INSERT INTO app_meta VALUES ('last_reset', now()::text) ON CONFLICT (key) DO UPDATE SET value = excluded.value`);
 }

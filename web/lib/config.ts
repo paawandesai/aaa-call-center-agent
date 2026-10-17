@@ -13,9 +13,17 @@ export const config = {
   bookingsPerSession: Number(process.env.BOOKINGS_PER_SESSION ?? 2),
   maxSlotsShown: 4,
   tz: "America/Chicago",
-  // Demo "now". The partner data's today is 2026-10-16; slots run to 2026-11-05.
+  // The partner data's today is 2026-10-16; slots run to 2026-11-05. DEMO_NOW pins the clock exactly (tests and the
+  // eval, so runs are repeatable). CLOCK_FLOOR is for the live demo: the clock never reads earlier than it, but it
+  // keeps moving with real time, so the app never offers or books a slot that has already passed.
   nowOverride: process.env.DEMO_NOW,
-  promptVersion: "agent-v5",
+  clockFloor: process.env.CLOCK_FLOOR,
+  promptVersion: "agent-v6",
 };
 
-export const now = () => (config.nowOverride ? new Date(config.nowOverride) : new Date());
+export const now = () => {
+  if (config.nowOverride) return new Date(config.nowOverride);
+  const real = new Date();
+  const floor = config.clockFloor ? new Date(config.clockFloor) : null;
+  return floor && floor.getTime() > real.getTime() ? floor : real;
+};

@@ -1,5 +1,5 @@
 {
- "_about": "Retrieval dev set: caller questions from the DISCOVERY split (Jul-Aug), paraphrased and redacted, follow-ups rewritten to stand alone. Gold = any chunk whose doc matches and whose text contains the section marker. Not the final test set; that comes from the September holdout.",
+ "_about": "Retrieval dev set: caller questions from the DISCOVERY split (Jul-Aug), paraphrased and redacted, follow-ups rewritten to stand alone. Gold = any chunk whose doc matches and whose text contains the section marker. This is the only retrieval set; there is no held-out retrieval set (September calls test retrieval only through the containment eval's required facts).",
  "items": [
   {
    "id": "d01",

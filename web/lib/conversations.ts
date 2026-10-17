@@ -18,6 +18,7 @@ export interface Conversation {
   verified?: Verified; // set only by a successful phone + ZIP match; scopes every account read and change
   verifyAttempts: number;
   safetyLock: boolean; // one-way: once set, no booking tools run in this conversation
+  selfHarm?: boolean; // one-way: once set, every later message gets the fixed 988 follow-up, never the model
   handoff?: HandoffReason;
   intents: string[];
   steps: string[];

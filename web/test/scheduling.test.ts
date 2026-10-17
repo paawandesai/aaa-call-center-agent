@@ -6,6 +6,8 @@ import { migrate } from "../lib/migrate";
 import { loadSeedFromSqlite } from "../lib/seed";
 import { confirmBooking, findSlots, isSlotAvailable, type PendingBooking } from "../lib/scheduling";
 import { pgliteDb } from "./pglite";
+import { maybeNightlyReset } from "../lib/reset";
+import { addSpend, overSpendCap, spendToday } from "../lib/ratelimit";
 
 // Runs against the partner's mock DB when it is present locally. It is never committed, so CI skips this file.
 const SQLITE = path.join(process.env.MERIDIAN_DATA_DIR ?? "/mnt/project-files/data/meridian_dataset", "scheduling_db/meridian_scheduling.sqlite");
@@ -88,5 +90,25 @@ run("scheduling against the seeded mock DB", () => {
     expect(a.ok).toBe(true);
     const b = await d.tx((q) => confirmBooking(q, { ...base, slot_id: slots[1].slot_id }, "k4"));
     expect(b).toEqual({ ok: false, reason: "cap_reached" });
+  });
+
+  it("runs the nightly reset and purges once when due, and keeps the spend total in the database", async () => {
+    await d.query(`UPDATE app_meta SET value = (now() - interval '2 days')::text WHERE key = 'last_reset'`);
+    await d.query(`INSERT INTO handoffs (session_id, reason, summary, created_at) VALUES ('old','complaint','x', now() - interval '8 days'), ('new','complaint','y', now())`);
+    process.env.DEMO_ACTIVITY = "0";
+    expect(await maybeNightlyReset(d)).toBe(true);
+    const { rows } = await d.query<{ s: string }>(`SELECT session_id AS s FROM handoffs ORDER BY id`);
+    expect(rows.map((r) => r.s)).toEqual(["new"]);
+    const { rows: m } = await d.query<{ fresh: boolean }>(`SELECT value::timestamptz > now() - interval '1 minute' AS fresh FROM app_meta WHERE key = 'last_reset'`);
+    expect(m[0].fresh).toBe(true);
+
+    process.env.DAILY_SPEND_CAP_USD = "0.01";
+    await addSpend(d, 0.004);
+    await addSpend(d, 0.004);
+    expect((await spendToday(d)).usd).toBeCloseTo(0.008);
+    expect(await overSpendCap(d)).toBe(false);
+    await addSpend(d, 0.004);
+    expect(await overSpendCap(d)).toBe(true);
+    delete process.env.DAILY_SPEND_CAP_USD;
   });
 });

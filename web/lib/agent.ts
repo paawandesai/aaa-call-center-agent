@@ -16,7 +16,8 @@ import { allow } from "./ratelimit";
 
 type Tool = Anthropic.Beta.BetaTool;
 const SERVICE_TYPES = ["hvac_repair", "hvac_tune_up", "plumbing", "estimate"] as const;
-const MODEL_HANDOFF_REASONS = ["safety", "billing_account", "cancel_reschedule", "complaint", "human_requested",
+// "self_harm" is a model-only label: it is stored as reason safety and shows the 988 script, not the gas/CO/fire one.
+const MODEL_HANDOFF_REASONS = ["safety", "self_harm", "billing_account", "cancel_reschedule", "complaint", "human_requested",
   "low_confidence", "service_area_unclear", "booking_failed", "out_of_scope"] as const;
 
 // Narrow tools. None of them writes: propose_booking and propose_appointment_change only show a card the caller confirms.
@@ -92,7 +93,7 @@ export const TOOLS: Tool[] = [
     input_schema: {
       type: "object",
       properties: {
-        reason: { type: "string", enum: [...MODEL_HANDOFF_REASONS] },
+        reason: { type: "string", enum: [...MODEL_HANDOFF_REASONS], description: "safety for gas, carbon monoxide, sparks, smoke, fire or burning smells; self_harm if the caller talks about hurting themselves or not wanting to live" },
         summary: { type: "string", description: "One or two sentences for staff: what the caller needs and what was already tried" },
       },
       required: ["reason", "summary"],
@@ -159,7 +160,8 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     c.messages.push({ role: "user", content: turnData(today(), [], text) });
     c.messages.push({ role: "assistant", content: reply });
     if (reason) {
-      const h = await createHandoff(deps.db, c, reason, `Routed by policy (${intent}).`, text);
+      // One handoff per reason per conversation: repeating the request doesn't add another ticket to the queue.
+      const h = c.handoff === reason ? undefined : await createHandoff(deps.db, c, reason, `Routed by policy (${intent}).`, text);
       c.handoff = reason;
       emit({ type: "handoff", reason_enum: reason, summary_for_caller: INTENT_SUMMARY[intent] ?? HANDOFF_COPY[reason], queue_position: h?.position });
     }
@@ -169,6 +171,7 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
   const r = route(text);
   if (r.kind === "safety") {
     c.safetyLock = true;
+    if (r.script === "self_harm") c.selfHarm = true;
     emit({ type: "safety", script: r.script, text: SCRIPTS[r.script] });
     await scripted(SCRIPTS[r.script], "safety", r.intent);
     return { ...res, outcome: "safety", handoffReason: "safety", intent: r.intent };
@@ -177,6 +180,12 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     emit({ type: "text_delta", text: HANDOFF_COPY[r.reason] });
     await scripted(HANDOFF_COPY[r.reason], r.reason, r.intent);
     return { ...res, outcome: "handoff", handoffReason: r.reason, intent: r.intent };
+  }
+  // After the 988 script the model never takes the conversation back: every later message gets the same short, fixed reply.
+  if (c.selfHarm) {
+    emit({ type: "text_delta", text: SCRIPTS.self_harm_followup });
+    await scripted(SCRIPTS.self_harm_followup, null, "self_harm");
+    return { ...res, outcome: "safety", handoffReason: "safety", intent: "self_harm" };
   }
   if (r.kind === "deflect") {
     emit({ type: "text_delta", text: SCRIPTS[r.script] });
@@ -261,6 +270,8 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
         results.push({ type: "tool_result", tool_use_id: u.id, content: out.content, is_error: out.isError || undefined });
       }
       c.messages.push({ role: "user", content: results });
+      // The 988 script is the whole reply; the model writes nothing after it, now or in later turns.
+      if (c.selfHarm) break;
     }
   } catch (e) {
     // Roll back this turn's unanswered tail so a retry starts clean; earlier turns are untouched.
@@ -322,12 +333,18 @@ export function supports(passage: string, answer: string): boolean {
   return false;
 }
 
-async function modelHandoff(deps: Deps, c: Conversation, reason: HandoffReason, summary: string, text: string, emit: Emit, res: TurnResult) {
-  if (reason === "safety") {
+async function modelHandoff(deps: Deps, c: Conversation, asked: (typeof MODEL_HANDOFF_REASONS)[number] | HandoffReason, summary: string, text: string, emit: Emit, res: TurnResult) {
+  const reason: HandoffReason = asked === "self_harm" ? "safety" : asked;
+  if (asked === "self_harm") {
+    c.safetyLock = true;
+    c.selfHarm = true;
+    c.intents.push("self_harm");
+    emit({ type: "safety", script: "self_harm", text: SCRIPTS.self_harm });
+  } else if (reason === "safety") {
     c.safetyLock = true;
     emit({ type: "safety", script: "gas_co_fire", text: SCRIPTS.gas_co_fire });
   }
-  const h = await createHandoff(deps.db, c, reason, summary, text);
+  const h = c.handoff === reason ? undefined : await createHandoff(deps.db, c, reason, summary, text);
   c.handoff = reason;
   res.outcome = reason === "safety" ? "safety" : "handoff";
   res.handoffReason = reason;

@@ -37,6 +37,32 @@ describe("deterministic routing", () => {
     ["My water heater is leaking. ZIP 78745.", "model"],
   ])("%s -> %s", (text, kind) => expect(route(text).kind).toBe(kind));
 
+  // Audit 2026-10-17: phrasings that used to reach the model.
+  it.each([
+    "I want to die", "honestly i just want to die", "I'm going to end it all", "there's no point living anymore",
+    "I'd be better off dead", "I don't want to be here anymore", "I can't do this anymore", "thinking about killing myself",
+    "I've been having suicidal thoughts", "I want to take my own life", "I keep hurting myself",
+  ])("self-harm: %s", (text) => expect(route(text)).toMatchObject({ kind: "safety", script: "self_harm" }));
+
+  it.each([
+    "this heat is killing me", "my AC is dying", "the compressor is going to die soon", "the water heater died last night",
+    "I'm dying in this heat, can someone come today?", "my furnace is dead",
+  ])("not self-harm: %s", (text) => expect(route(text).kind).not.toBe("safety"));
+
+  it.each([
+    "I was double-charged for the visit", "you overcharged me", "I'm disputing this charge", "has my deposit been refunded?",
+    "I'd like to file a complaint", "I'm complaining about the tech who came out", "I was over-charged",
+  ])("billing or complaint: %s", (text) => expect(route(text).kind).toBe("handoff"));
+
+  it.each([
+    "I want a human", "transfer me to someone", "can I get a person?", "representative please", "Agent", "a real person",
+    "connect me with a representative", "is there a human I can talk to?", "I need a manager", "just transfer me",
+  ])("human requested: %s", (text) => expect(route(text)).toMatchObject({ kind: "handoff", reason: "human_requested" }));
+
+  it.each([
+    "I need a person to come out and look at my AC", "can you get someone out here tomorrow?", "my water heater is leaking",
+  ])("not a human request: %s", (text) => expect(route(text)).not.toMatchObject({ reason: "human_requested" }));
+
   it("does not treat safety as bookable even when the caller also asks to book", () => {
     expect(route("I smell gas, can you book a tech for tomorrow?").kind).toBe("safety");
   });

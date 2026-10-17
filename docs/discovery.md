@@ -1,5 +1,7 @@
 # Call-driver discovery
 
+_Scope update 2026-10-17: see [Scope change](#scope-change-2026-10-17) at the end; the handle/escalate table and ceiling below are the original 2026-10-16 analysis._
+
 _Run 2026-10-16 on the discovery split only: the 320 July–August calls. The 100 September calls are held out (`eval/holdout_manifest.txt`) and were not read. All counts come from redacted transcripts. Caller requests below are paraphrased, not quoted._
 
 ## Method
@@ -76,3 +78,14 @@ Reaching 60% would mean handling account-dependent work (billing lookups, appoin
 - Labels are rule-based and validated only against the clusters, not against a second human labeler.
 - The corpus is templated, so real calls would be messier. The September holdout tests this.
 - Multi-intent calls are labeled by their first request. Only 3 calls explicitly bundled two requests.
+
+## Scope change (2026-10-17)
+
+The owner chose to let the agent do verified account work: after a phone number and ZIP match one customer, it answers that customer's appointment, invoice, balance and renewal-date questions, and moves or cancels their appointments through a confirm card. This reverses the 2026-10-16 decision above that reschedules and cancellations escalate, and the "do not widen scope" line. Phone plus ZIP is weak verification; the README lists it as a known constraint.
+
+Still escalated: payments, disputes, refunds, autopay, membership cancellations, contact-detail edits, late technicians, complaints and safety.
+
+The ceiling was recomputed on the labelled eval sets rather than this table: 69 of the 100 held-out September calls may be handled (was 48 under the old scope), and 84 of the 130 dev calls. The README's Results section has the run-by-run numbers.
+
+The k-means cluster sizes are not reported here; the clusters were only used to write the labelling rules, and the counts above are rule labels over the 318 de-duplicated calls.
+

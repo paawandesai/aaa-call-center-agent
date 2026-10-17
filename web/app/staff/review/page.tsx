@@ -88,7 +88,7 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
               <div className="stack-8">
                 <span className="label">Session {shortId(sel.session_id)} · {KIND[sel.kind].source}</span>
                 <h2 className="h1">{KIND[sel.kind].title}</h2>
-                <p className="muted" style={{ margin: 0, maxWidth: 680 }}>Chat text is not stored, so this trace is metadata only. Ask the caller-facing team for context if the trace is not enough.</p>
+                <p className="muted" style={{ margin: 0, maxWidth: 680 }}>Chat text is not written to the database, so this trace is metadata only. Ask the caller-facing team for context if the trace is not enough.</p>
               </div>
 
               <section className="stack-8">

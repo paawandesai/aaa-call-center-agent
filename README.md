@@ -2,8 +2,10 @@
 
 An AI chat agent for the inbound line of Meridian Home Comfort, a fictional HVAC and plumbing company in Austin, TX. It answers fee, hours, membership and warranty questions from the company knowledge base, books visits against the scheduling database, verifies callers to answer questions about their own appointments, invoices and renewal date and to move or cancel visits, and hands everything else to a person with a summary. Built for the AEA FDE challenge.
 
+HVAC and plumbing is not a regulated industry, so there is no HIPAA, PCI or similar regime here; the agent takes no payments. Gas, carbon monoxide, fire and self-harm are life-safety matters, so they always get a fixed script and a handoff, never a model answer.
+
 - **Demo:** https://meridian-web-production-c743.up.railway.app (invite code sent with the submission; staff pages need the separate staff code)
-- **Results:** 69% of held-out calls contained and correct (95% CI 59–77%), inside the brief's 60–75% target and equal to the ceiling of 69%: every call the agent may handle was handled correctly, and every call that should go to a person did. The first, untuned run scored 37%. Later runs follow changes made after seeing it, including a scope change to verified account work and fixes to the simulated caller; see [Results](#results).
+- **Results:** 69% of held-out calls contained and correct (95% CI 59–77%), inside the brief's 60–75% target and equal to the ceiling of 69%: every call the agent may handle was handled correctly, and every call that should go to a person did. The held-out set has been run several times, and the agent and the test harness were both changed after seeing earlier results, so 69% is not a clean first-look number; see [Results](#results) and its caveats.
 
 ## What is built
 
@@ -11,7 +13,7 @@ An AI chat agent for the inbound line of Meridian Home Comfort, a fictional HVAC
 |---|---|---|
 | Call-driver discovery | `discovery/`, `docs/discovery.md` | Runs on redacted July–August transcripts only. |
 | Retrieval | `web/lib/retrieval.ts`, `docs/retrieval.md` | Curated KB chunks, local `bge-small-en-v1.5` embeddings, pgvector. Stale and internal docs are excluded at ingest. |
-| Agent | `web/lib/agent.ts`, `web/lib/policy.ts`, `web/lib/prompt.ts` | Deterministic policy routing first (safety, payments and disputes, membership cancellations, late technicians, complaints, asks for a person, unclear service-area ZIPs, prompt injection), then Claude (Haiku 5.5 by default, `AGENT_MODEL`) with seven narrow tools: `search_kb`, `check_availability`, `propose_booking`, `verify_caller`, `lookup_account`, `propose_appointment_change`, `handoff`. |
+| Agent | `web/lib/agent.ts`, `web/lib/policy.ts`, `web/lib/prompt.ts` | Deterministic policy routing first (gas/CO/fire and self-harm safety scripts, payments and disputes, membership cancellations, late technicians, complaints, asks for a person, unclear service-area ZIPs, prompt injection), then Claude (Haiku 5.5 by default, `AGENT_MODEL`) with seven narrow tools: `search_kb`, `check_availability`, `propose_booking`, `verify_caller`, `lookup_account`, `propose_appointment_change`, `handoff`. |
 | Accounts | `web/lib/accounts.ts`, `web/app/api/appointments/change` | A caller is verified when phone number and ZIP both match one customer (3 tries per chat, 10 per session per hour). Reads are scoped server-side to that customer. Moves and cancellations show a card with any late fee; the server re-checks ownership and the slot and writes in one transaction when the caller presses Confirm. |
 | Booking | `web/lib/scheduling.ts`, `web/app/api/bookings/confirm` | The model only proposes. The caller presses Confirm, and the server re-checks the slot and writes the booking in one transaction. A trigger blocks double-booking a technician. |
 | Chat UI | `web/app/chat`, `web/components/Chat.tsx` | Streams text, shows slots, confirm cards for bookings and changes, source chips and handoff cards. Says "Booked", "Moved" or "Cancelled" only after the database write. The rail lists three made-up demo customers to try account features with. |
@@ -22,7 +24,7 @@ Voice is not built.
 
 ## Results
 
-Final run `20261017T1836-6adc`, prompt `agent-v5`, model Haiku 5.5, config `a9a0024562`. The test set is all 100 September 2026 calls, frozen before any analysis (`eval/holdout_manifest.txt`). Each call becomes a paraphrased, redacted opening line plus a simulated caller that answers ZIP, name and verification questions, picks the first time offered and presses Confirm. The simulated caller acts on what its call was for: a caller with a question turns down a visit offer, a caller who wants a visit accepts one, and a caller asked what kind of unit failed knows the answer. Every check is code: the expected outcome from the call's driver, required facts (from the current KB, or from the assigned customer's records for account calls), forbidden stale values from the archived docs, and checks that the reply never claims a booking or change the database did not record. No model grades another model.
+Final run `20261017T1836-6adc`, prompt `agent-v5`, model Haiku 5.5, config `a9a0024562`. The test set is all 100 September 2026 calls (`eval/holdout_manifest.txt`). The split was made before call-driver discovery and the code enforces it, but a keyword count and 25 sampled first lines over all 420 calls were looked at before the split (`plans/guardrail_audit.md` in the project files). Each call's opening line is the caller's first turn, verbatim from the redacted transcript (not paraphrased), plus a simulated caller that answers ZIP, name and verification questions, picks the first time offered and presses Confirm. The simulated caller acts on what its call was for: a caller with a question turns down a visit offer, a caller who wants a visit accepts one, and a caller asked what kind of unit failed knows the answer. Every check is code: the expected outcome from the call's driver, required facts (from the current KB, or from the assigned customer's records for account calls), forbidden stale values from the archived docs, and checks that the reply never claims a booking or change the database did not record. No model grades another model.
 
 | Metric | Run 1 (agent-v2, Opus) | Run 2 (agent-v3) | Run 3 (agent-v4) | **Run 4 (agent-v5)** | n (run 4) | 95% CI (run 4) |
 |---|---|---|---|---|---|---|
@@ -39,7 +41,7 @@ Runs 2 to 4 use Haiku 5.5.
 
 **Read these numbers with three caveats.**
 
-1. Only run 1 is clean. Runs 2 and 3 come after changes made once we had seen run 1, so the held-out set is no longer untouched. To limit that, all tuning happened on a separate dev set (July–August discovery calls, labels in `eval/dev_labels.json`), and each held-out run was done once with a finished config.
+1. No run is fully clean. The first held-out run (agent-v1, `20261016T2345-b098`) scored 29%; after reading its failures, three harness bugs were fixed and agent-v1 was run again at 37%, then agent-v2 at 37% (run 1 in the table). The dev set (July–August discovery calls, labels in `eval/dev_labels.json`) was only created on 2026-10-17, so everything before run 2 was tuned with the held-out results in view. From run 2 on, changes were tried on the dev set first and each held-out run was done once with a finished config, but the held-out results still informed what was tried next.
 2. Run 3 changes the scope, not just the agent. By the owner's decision (2026-10-17), verified callers' own appointment, invoice and balance questions and appointment moves and cancellations are now handled by the agent instead of a person. That relabels 21 held-out calls from "escalate" to "handle" (`eval/results/holdout_labels_before_account_scope.json` keeps the old labels), which is why the ceiling rose from 48% to 69%. Payments, disputes, refunds, autopay, membership cancellations, late technicians, complaints and safety still go to a person.
 3. Run 4 changes the test harness, not just the agent. Most of run 3's five misses came from the simulated caller, not the agent: it said yes to every visit offer (so question calls ended in bookings) and couldn't say what kind of unit had failed. Run 4's simulated caller acts on what its call was for (above), and one label was corrected ("$500 off a new system" now counts as a correct answer to the membership discount question). The only agent change was one prompt line: water pooling around the indoor unit is an HVAC repair, not plumbing. A perfect score on 100 calls with a simulated caller is not a promise of perfect behaviour with real callers; the 95% interval on accuracy is 95–100%.
 
@@ -55,11 +57,22 @@ All measured on the dev set first (`eval/results/dev_runs/`):
 - **Run 3 (agent-v4).** Caller verification, account lookups and appointment moves and cancellations, as above. On dev (130 calls, with every discovery call in the new account intents added) three runs scored 58, 75 and 72; the first exposed a real bug (the mock data's slot zones don't follow customer ZIPs, so moves were rejected), which was fixed. Four account-abuse attacks were added to the adversarial set.
 - **Run 4 (agent-v5).** The condensate prompt line and the harness and label fixes in caveat 3. Dev: 80, then 83 of 130 (ceiling 84) after a second harness fix (a verified caller who only asked a question turns down an offer to change the visit).
 
-Earlier history: run `20261016T2345-b098` (agent-v1) scored 29% because of three harness bugs; fixing the harness moved it to 37% (run `20261016T2351-8571`), and agent-v2 kept 37% while withdrawing the model's notes to itself. All summaries are in `eval/results/` (`containment_holdout_agent-v2.json`, `_agent-v3.json`, `_agent-v4.json`, and the current `containment_holdout.json`).
+Earlier history: run `20261016T2345-b098` (agent-v1) scored 29% because of three harness bugs; fixing the harness moved it to 37% (run `20261016T2351-8571`), and agent-v2 kept 37% while withdrawing the model's notes to itself. Those three runs are the history caveat 1 refers to. All summaries are in `eval/results/` (`containment_holdout_agent-v2.json`, `_agent-v3.json`, `_agent-v4.json`, and the current `containment_holdout.json`).
 
 ### Adversarial set
 
-`eval/adversarial/cases.json` holds 22 synthetic attacks and 6 synthetic KB probes. Final run: **22 of 22 held** (prompt leaks, persona swaps, fake admin discounts, stale-price bait, SQL and HTML injection, booking a slot that was never offered, gas leak plus "just book it", self-harm, other callers' bookings, injected instructions in a name, and four account attacks: asking for a balance with only a phone number, guessing ZIPs until locked out, asking for a neighbour's records after verifying, and demanding a cancellation without the confirm card). KB probes: 6 of 6 (the Saturday-hours probe failed in the first run and passes after the holiday-hours chunking fix). Three regexes in this synthetic set had false negatives (for example "no discount has been applied" matched the forbidden pattern) and were fixed between runs.
+`eval/adversarial/cases.json` holds synthetic attacks and 6 synthetic KB probes; the counts below are from run 4, before the cases added after the 2026-10-17 audit (see [After the audit](#after-the-audit-2026-10-17)). Final run: **22 of 22 held** (prompt leaks, persona swaps, fake admin discounts, stale-price bait, SQL and HTML injection, booking a slot that was never offered, gas leak plus "just book it", self-harm, other callers' bookings, injected instructions in a name, and four account attacks: asking for a balance with only a phone number, guessing ZIPs until locked out, asking for a neighbour's records after verifying, and demanding a cancellation without the confirm card). KB probes: 6 of 6 (the Saturday-hours probe failed in the first run and passes after the holiday-hours chunking fix). Three regexes in this synthetic set had false negatives (for example "no discount has been applied" matched the forbidden pattern) and were fixed between runs.
+
+### Where the eval cases are
+
+The repo has the case builder (`eval/build_cases.py`), the hashed holdout manifest and the expected labels, but not the case text: each case opens with a caller's redacted first turn, and the guardrails keep transcript text, even redacted, out of the repo. A reviewer with the challenge dataset rebuilds the identical cases: set `MERIDIAN_DATA_DIR`, run `python discovery/redact.py`, then `python eval/build_cases.py` (holdout) and `python eval/build_cases.py dev`. `npm run eval` also needs the mock scheduling database from the same dataset.
+
+## Monitoring and feedback loop
+
+- **What is measured live:** every turn writes an event with opaque ids, outcome, handoff reason, latency, tokens and retrieval score (no text). The staff dashboard shows containment, handoff reasons, failures, spend against the daily cap and the last reset.
+- **Alerting:** `/api/health` reports the model, prompt version, last reset, last successful reply and the past hour's error count, and returns 503 when the data is missing, the nightly reset is more than 26 hours old, or at least half of the past hour's turns failed (with five or more turns). An uptime monitor polls it; see [Running it](#running-it).
+- **Where problems go:** one review queue collects caller thumbs-downs, errors, low-confidence handoffs, failed bookings and staff flags from the handoff queue ("summary wrong", "could have answered"). A reviewer records agree, disagree or needs fix, a proposed fix, and whether the case should join the regression set.
+- **How a fix ships:** a person turns a review into a code, prompt or KB change, it runs on the dev set, and only a finished config gets a held-out run. Nothing is promoted automatically.
 
 ## Data handling
 
@@ -67,13 +80,13 @@ The partner dataset (transcripts, KB, scheduling DB) is confidential and never e
 
 - **Holdout:** every call dated September 2026 (100 of 420) is held out. Discovery code reads transcripts only through `discovery_call_ids()`, which refuses holdout calls. The committed `eval/holdout_labels.json` has hashed ids and labels only.
 - **Redaction:** regex plus spaCy NER removes account and invoice ids, phones, emails, addresses, ZIPs, gate codes, customer and staff names (2,235 redactions, 0 leaks in the check).
-- **In the app:** no caller text is logged. Events hold opaque ids, outcomes and timings, kept 30 days. Handoff records carry an AI-written summary and a redacted 300-character excerpt, purged after 7 days. The demo database resets nightly.
+- **In the app:** every message is sent to Anthropic's API to write the reply. The conversation is held in server memory for up to 2 hours and is not written to the database or logs. Events hold opaque ids, outcomes and timings, kept 30 days. Handoff records carry the name and ZIP the caller gave, an AI-written summary and a redacted 300-character excerpt, purged after 7 days. Test bookings keep the name and issue text until the nightly reset. The invite page and the chat say this.
 
 ## Running it
 
 ```bash
 cd web && npm ci
-npm test                                   # 51 unit tests on in-process Postgres (PGlite)
+npm test                                   # unit tests on in-process Postgres (PGlite)
 # set the variables in ../.env.example (DATABASE_URL=pglite:memory runs an in-process database)
 npm run build && npm start
 npm run eval                               # full holdout + adversarial run, about $0.05 on Haiku (about $1.40 on Opus)
@@ -81,7 +94,7 @@ npm run eval -- --split dev                # the dev set used for tuning
 python3 ../eval/publish_results.py         # copies the summary to the /evaluation page
 ```
 
-Deploy: Railway, Next.js plus Postgres with pgvector. `web/railway.json` runs `npm run db:setup` before each deploy (migrations, seed, KB embeddings). Copy the seed DB and KB chunks into `web/.seed/` (gitignored) and run `railway up --no-gitignore` from `web/`.
+Deploy: Railway, Next.js plus Postgres with pgvector, one replica of the `meridian-web` service. Railway does not read `web/railway.json` for this service; the pre-deploy command (`npm run db:setup`: migrations, seed, KB embeddings) and the `/api/health` check are set on the service itself, and `railway.json` records the same settings. Copy the seed DB and KB chunks into `web/.seed/` (gitignored) and run `railway up -s meridian-web --no-gitignore` from `web/`. A timer started at server boot (`web/instrumentation.ts`) runs the nightly reset and the 7- and 30-day purges at 03:00 Central even with no traffic. Point an uptime monitor (Railway's or any external one) at `/api/health`.
 
 ## Known constraints
 
@@ -91,8 +104,8 @@ These are places where the project's guardrails override the brief, or where the
 2. **Containment ceiling:** payments, disputes, refunds, membership cancellations, complaints and safety always escalate, so containment can't pass 69% on this set. The measured number is reported next to the ceiling.
 3. **Weak verification:** phone number plus ZIP is enough to read and change a customer's appointments in this demo. That is fine for synthetic data; a real deployment would need a one-time code to the phone on file.
 4. **Writes:** the model never writes to the database. Bookings and changes are written by the server after the caller presses Confirm.
-5. **Mock schedule ends 2026-11-05.** After that date there are no open slots, so bookings hand off. Setting `DEMO_NOW` pins the app's clock to a date inside the schedule; the demo is pinned to 2026-10-19.
-6. **Single instance:** conversations, rate limits and the spend cap live in memory, so the app runs as one replica and a restart ends open chats.
+5. **Mock schedule ends 2026-11-05.** After that date there are no open slots, so bookings hand off. The live demo sets `CLOCK_FLOOR=2026-10-19T14:00:00Z`: the clock never reads earlier than that, but it follows real time after it, so the app never offers or books a slot that has passed. `DEMO_NOW` pins the clock exactly and is used only by tests and the eval.
+6. **Single instance:** conversations and request rate limits live in memory, so the app runs as one replica and a restart ends open chats. The daily spend total is kept in Postgres, so it survives restarts and deploys. Chat is limited per session and per client IP (the address Railway's proxy appends).
 7. **Database engine:** the brief ships SQLite; the deployment uses Postgres.
 8. **Repo visibility:** the repo is "internal" on Gauntlet's GitLab by the owner's decision, so it holds no raw data, KB files or database dumps.
 9. **Dashboard numbers are live and unverified.** The graded numbers come only from the eval run.

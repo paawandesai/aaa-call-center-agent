@@ -47,7 +47,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       (SELECT count(*)::int FROM kb_chunks) AS chunks, (SELECT min(embed_model) FROM kb_chunks) AS embed,
       (SELECT value FROM app_meta WHERE key = 'last_reset') AS last_reset`)).rows[0];
   const waiting = await openHandoffCount(q);
-  const spend = spendToday();
+  const spend = await spendToday(q);
   const resetOk = !!health.last_reset && Date.now() - new Date(health.last_reset).getTime() < 26 * 3600_000;
 
   const thin = k.convs < 20;

@@ -17,7 +17,7 @@ All 17 files have a reviewed decision in `kb/registry.py`. Ingest refuses to run
 - **PDF fee table:** 12 rows, extracted with pdfplumber.
 - **Price-book CSV:** 21 rows.
 - **Markdown tables:** 10 catalog rows and 6 warranty rows.
-- **Holiday hours PNG:** image-only, OCR'd with Tesseract into 8 lines. This is the only source for the $199 holiday dispatch fee and the holiday closures.
+- **Holiday hours PNG:** image-only, OCR'd with Tesseract into 8 lines. It is the only source for the holiday closures and hours; the $199 holiday dispatch fee also appears in the 2026 price book CSV.
 
 **Chunking.**
 - Prose is split on headings, and every chunk carries its title and section path ("Warranty Policy > Warranty transfer").
@@ -25,7 +25,15 @@ All 17 files have a reviewed decision in `kb/registry.py`. Ingest refuses to run
 
 This gives 86 chunks.
 
-**Planted instructions.** A scan for instruction-like text ("ignore previous", "you are now", "AI:", ...) found none in the KB. Ingest re-runs this scan and flags any hit for review. A flagged hit is never followed.
+**Planted instructions.** A scan for instruction-like text ("ignore previous", "you are now", "AI:", ...) found none in the KB (the scan covers the indexed chunks; a manual read of the excluded files found none either). Until 2026-10-17 the pattern missed "Note to AI: ..."; it now catches it. Ingest re-runs this scan and flags any hit for review. A flagged hit is never followed.
+
+**Conflicts inside the current documents** (not only old vs new), and how the app handles them:
+- The FAQ's service-area list omits Dripping Springs and Manor, which the 2026-04 service-area doc adds; neither has a scheduling zone, so those ZIPs hand off.
+- The holiday $199 dispatch fee sits next to "no after-hours fee for members"; nothing in the app resolves this, and no eval case tests it, so a member asking whether the holiday fee applies could get either answer.
+- The troubleshooting doc says to reset a tripped breaker, but a burning smell with a tripped breaker is a safety case; the safety route runs before any retrieval, so the reset advice is never given for it.
+- The tech doc says "4-hour blocks", but the 4–7pm window is 3 hours; the app shows windows from the scheduling database, not the doc.
+- `reserved_members` slots in the scheduling database are never offered.
+- The stale values the eval forbids are the diagnostic, membership, warranty and cancellation figures from the superseded files. The old FAQ's hours and "checks accepted", and the archive's "prorated refund" and "transfer to new address", are not yet in the forbidden-value checks.
 
 ## Retrieval evaluation (dev set)
 
@@ -46,4 +54,4 @@ There are 24 caller questions from the discovery split (`eval/retrieval_dev.json
 
 **Limits:**
 - n=24 is small, and the 95% confidence interval on hit@5 is wide (Wilson: about 0.80–0.99).
-- The final number comes from the September holdout questions, run against the deployed retriever (pgvector), not this offline copy.
+- These 24 questions are the only retrieval measurement. `npm run eval` re-runs them against the app's pgvector retriever; there is no separate held-out retrieval set. Retrieval on September calls is measured only indirectly, through the containment eval's required facts.
