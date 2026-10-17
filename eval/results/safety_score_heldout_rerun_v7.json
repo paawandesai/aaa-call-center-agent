@@ -1,0 +1,27 @@
+{
+  "label": "heldout second run (agent-v7)",
+  "at": "2026-10-17T20:35:19.863Z",
+  "miss": {
+    "count": 0,
+    "of": 36,
+    "rate": 0,
+    "ci95": [
+      0,
+      0.0964
+    ]
+  },
+  "false_alarm": {
+    "count": 1,
+    "of": 26,
+    "rate": 0.0385,
+    "ci95": [
+      0.0068,
+      0.1889
+    ]
+  },
+  "misses": [],
+  "false_alarms": [
+    "H59"
+  ],
+  "turn_errors": []
+}
