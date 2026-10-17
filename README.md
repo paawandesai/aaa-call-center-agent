@@ -70,7 +70,7 @@ The repo has the case builder (`eval/build_cases.py`), the hashed holdout manife
 ## Monitoring and feedback loop
 
 - **What is measured live:** every turn writes an event with opaque ids, outcome, handoff reason, latency, tokens and retrieval score (no text). The staff dashboard shows containment, handoff reasons, failures, spend against the daily cap and the last reset.
-- **Alerting:** `/api/health` reports the model, prompt version, last reset, last successful reply and the past hour's error count, and returns 503 when the data is missing, the nightly reset is more than 26 hours old, or at least half of the past hour's turns failed (with five or more turns). Nothing outside the app polls it yet: Railway checks it only at deploy time. Running this unattended needs an uptime monitor pointed at it that alerts a person; see [Running it](#running-it).
+- **Alerting:** `/api/health` reports the model, prompt version, last reset, last successful reply and the past hour's error count, and returns 503 when the data is missing, the nightly reset is more than 26 hours old, or at least half of the past hour's turns failed (with five or more turns). An external monitor (Better Stack Uptime, free tier) polls it every few minutes and emails the owner when it is unreachable or returns a non-2xx status. Railway's own check runs only at deploy time.
 - **Where problems go:** one review queue collects caller thumbs-downs, errors, low-confidence handoffs, failed bookings and staff flags from the handoff queue ("summary wrong", "could have answered"). A reviewer records agree, disagree or needs fix, a proposed fix, and whether the case should join the regression set.
 - **How a fix ships:** a person turns a review into a code, prompt or KB change, it runs on the dev set, and only a finished config gets a held-out run. Nothing is promoted automatically.
 
@@ -110,7 +110,7 @@ npm run eval -- --split dev                # the dev set used for tuning
 python3 ../eval/publish_results.py         # copies the summary to the /evaluation page
 ```
 
-Deploy: Railway, Next.js plus Postgres with pgvector, one replica of the `meridian-web` service. Railway does not read `web/railway.json` for this service; the pre-deploy command (`npm run db:setup`: migrations, seed, KB embeddings) and the `/api/health` check are set on the service itself, and `railway.json` records the same settings. Copy the seed DB and KB chunks into `web/.seed/` (gitignored) and run `railway up -s meridian-web --no-gitignore` from `web/`. A timer started at server boot (`web/instrumentation.ts`) runs the nightly reset and the 7- and 30-day purges at 03:00 Central even with no traffic. Point an external uptime monitor at `/api/health` that alerts a person; none is set up yet.
+Deploy: Railway, Next.js plus Postgres with pgvector, one replica of the `meridian-web` service. Railway does not read `web/railway.json` for this service; the pre-deploy command (`npm run db:setup`: migrations, seed, KB embeddings) and the `/api/health` check are set on the service itself, and `railway.json` records the same settings. Copy the seed DB and KB chunks into `web/.seed/` (gitignored) and run `railway up -s meridian-web --no-gitignore` from `web/`. A timer started at server boot (`web/instrumentation.ts`) runs the nightly reset and the 7- and 30-day purges at 03:00 Central even with no traffic. Better Stack Uptime polls `/api/health` and emails the owner on failure; a deployment elsewhere needs its own monitor pointed at it.
 
 ## Known constraints
 
