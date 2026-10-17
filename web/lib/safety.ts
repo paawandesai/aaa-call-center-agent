@@ -32,7 +32,7 @@ category: the kind of real, present danger the message reports or suggests, or "
 - self_harm: the caller may hurt or kill themselves, wants to die, says goodbye, or hints at it ("I won't be around", "no way out"), in any language.
 - medical: someone needs emergency care now (fainted, can't breathe, chest pain, unresponsive, a baby or elderly person in danger from heat or cold).
 - threat_by_caller: the caller threatens to hurt someone.
-- caller_in_danger: someone is threatening, attacking or breaking in on the caller.
+- caller_in_danger: someone is threatening, attacking or breaking in on the caller, or the caller is witnessing someone being attacked or crying for help right now.
 - domestic_violence: a partner or family member is hurting or threatening the caller.
 - other_emergency: any other present danger to a person's life or health.
 Ordinary equipment problems (no heat, no cooling, a leak, a noise, a part question, a price question about detectors) are "none". So are past events that are over and questions about safety devices. A hot or cold home is "none" unless the message says a person has symptoms or is especially vulnerable and suffering (an infant, an elderly or sick person).
