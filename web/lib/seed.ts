@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { now } from "./config";
-import { CLOSED_DATES } from "./scheduling";
+import { CLOSED_DATES, findSlots, type ServiceType } from "./scheduling";
+import type { Zone } from "./zones";
 import type { Db, Queryable } from "./db";
 
 type Row = Record<string, unknown>;
@@ -85,8 +86,35 @@ export async function resetLiveTablesIn(q: Queryable) {
   await q.query(`INSERT INTO invoices (invoice_id, customer_id, appointment_id, issued_date, due_date, amount_cents, balance_cents, line_items)
     SELECT invoice_id, customer_id, appointment_id, issued_date + $1::int, due_date + $1::int, amount_cents, balance_cents, line_items
     FROM seed_invoices`, [off]);
+  await seedRailCustomers(q);
   await q.query(`DELETE FROM sessions WHERE expires_at < now()`);
   await q.query(`DELETE FROM events WHERE ts < now() - interval '30 days'`);
   await q.query(`INSERT INTO app_meta VALUES ('last_reset', now()::text) ON CONFLICT (key) DO UPDATE SET value = excluded.value`);
   await q.query(`INSERT INTO app_meta VALUES ('seed_offset_days', $1) ON CONFLICT (key) DO UPDATE SET value = excluded.value`, [String(off)]);
+}
+
+// Three synthetic customers (555 phone numbers, invented names) for the chat rail's "Demo accounts to try", so the page
+// never shows a partner customer. Each reset gives them an upcoming visit on a free slot and an open invoice.
+// customer_id starts with RAIL- so demoIdentities can pick them and the eval can leave them out.
+const RAIL: { id: string; name: string; phone: string; address: string; city: string; zip: string; zone: Zone; service: ServiceType; issue: string }[] = [
+  { id: "RAIL-1", name: "Dana Example", phone: "512-555-0101", address: "100 Sample St", city: "Austin", zip: "78745", zone: "central", service: "hvac_repair", issue: "AC blowing warm air" },
+  { id: "RAIL-2", name: "Morgan Example", phone: "512-555-0102", address: "200 Sample Ave", city: "Round Rock", zip: "78664", zone: "north", service: "hvac_tune_up", issue: "Fall furnace tune-up" },
+  { id: "RAIL-3", name: "Riley Example", phone: "512-555-0103", address: "300 Sample Ln", city: "Kyle", zip: "78640", zone: "south", service: "plumbing", issue: "Water heater leaking" },
+];
+async function seedRailCustomers(q: Queryable) {
+  const t = now();
+  const cdate = (days: number) => new Date(t.getTime() + days * 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  for (const [i, c] of RAIL.entries()) {
+    await q.query(`INSERT INTO customers (customer_id,name,phone,service_address,city,zip) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [c.id, c.name, c.phone, c.address, c.city, c.zip]);
+    const [slot] = await findSlots(q, { zone: c.zone, service_type: c.service, on_or_after: cdate(3 + i) });
+    if (slot) {
+      await q.query(`INSERT INTO appointments (slot_id, customer_id, issue_description) VALUES ($1,$2,$3)`, [slot.slot_id, c.id, c.issue]);
+      await q.query(`UPDATE appointment_slots SET status = 'booked' WHERE slot_id = $1`, [slot.slot_id]);
+    }
+    const cents = [18900, 8900, 24500][i];
+    await q.query(`INSERT INTO invoices (invoice_id, customer_id, appointment_id, issued_date, due_date, amount_cents, balance_cents, line_items)
+      VALUES ($1,$2,NULL,$3::date,$4::date,$5,$5,$6::jsonb)`,
+      [`INV-90000${i + 1}`, c.id, cdate(-10), cdate(20), cents, JSON.stringify([{ desc: "Earlier service visit (demo)", cents }])]);
+  }
 }

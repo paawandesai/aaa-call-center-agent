@@ -116,6 +116,8 @@ def parse_png(p: Path) -> tuple[list[tuple[str, str]], dict]:
     return pieces, {"ocr_lines": len(lines) - 1}
 
 
+# Phone extensions and named staff contacts are internal and must not reach callers.
+STAFF_CONTACT = re.compile(r"(?i:\b(ext\.?|extension|x)\s*\d{2,5}\b)|\b(?i:ask for|contact|reach|email|call)\s+[A-Z][a-z]+\s+[A-Z][a-z]+\b")
 INSTRUCTION_LIKE = re.compile(r"(?i)\b(ignore (all|previous)|you are now|as an ai|system prompt|ai:|assistant:|always offer|disregard|note to (the )?(ai|assistant|model|bot))")
 
 
@@ -147,11 +149,13 @@ def main() -> None:
             entry.update(chunks=len(pieces), **extra)
         report.append(entry)
     flagged = [c["id"] for c in chunks if INSTRUCTION_LIKE.search(c["text"])]
-    if flagged:
-        print(f"WARNING instruction-like text in chunks (flag for review, never follow): {flagged}")
+    staff = [c["id"] for c in chunks if STAFF_CONTACT.search(c["text"])]
+    # Either one stops the build: a reviewer fixes the source doc or the registry, nothing is indexed meanwhile.
+    if flagged or staff:
+        raise SystemExit(f"refusing to write chunks: instruction-like text {flagged}, staff names or extensions {staff}")
     (OUT / "chunks.json").write_text(json.dumps(chunks, indent=1))
     (OUT / "ingest_report.json").write_text(json.dumps(report, indent=1))
-    print(f"files={len(files)} indexed={sum(e['indexed'] for e in report)} chunks={len(chunks)} instruction_like={len(flagged)}")
+    print(f"files={len(files)} indexed={sum(e['indexed'] for e in report)} chunks={len(chunks)} instruction_like=0 staff_contacts=0")
     for e in report:
         flag = "INDEX" if e["indexed"] else "skip "
         print(f"  {flag} {e['file']:45s} {e['status']:10s} {e.get('chunks', ''):>3} {e.get('table_rows', e.get('ocr_lines', '')) or ''}")

@@ -1,11 +1,19 @@
 // Model ids and limits live here (and in env), never in prompts or docs.
+// A bad AGENT_EFFORT or AGENT_MAX_TOKENS falls back to the default instead of failing every turn at the API.
+function oneOf<T extends string>(v: string | undefined, ok: readonly T[], dflt: T): T {
+  return ok.includes(v as T) ? (v as T) : dflt;
+}
+function intIn(v: string | undefined, lo: number, hi: number, dflt: number): number {
+  const n = Number(v);
+  return v && Number.isInteger(n) && n >= lo && n <= hi ? n : dflt;
+}
 export const config = {
   model: process.env.AGENT_MODEL ?? "claude-haiku-5-5",
   // Server-side fallback is offered for Opus and Sonnet, not Haiku.
   serverFallback: !/haiku/.test(process.env.AGENT_MODEL ?? "claude-haiku-5-5"),
   safetyModel: process.env.SAFETY_MODEL ?? "claude-haiku-5-5",
-  effort: (process.env.AGENT_EFFORT ?? "low") as "low" | "medium" | "high",
-  maxTokens: Number(process.env.AGENT_MAX_TOKENS ?? 1024),
+  effort: oneOf(process.env.AGENT_EFFORT, ["low", "medium", "high"] as const, "low"),
+  maxTokens: intIn(process.env.AGENT_MAX_TOKENS, 256, 8192, 1024),
   maxToolRounds: 4,
   embedModel: "Xenova/bge-small-en-v1.5",
   // Pinned to one Hugging Face commit, so a rebuild can't fetch changed weights that no longer match the stored KB vectors.
@@ -20,7 +28,7 @@ export const config = {
   bookingAttemptsPerIpDay: Number(process.env.BOOKING_ATTEMPTS_PER_IP_DAY ?? 10),
   maxSlotsShown: 4,
   tz: "America/Chicago",
-  promptVersion: "agent-v9",
+  promptVersion: "agent-v10",
 };
 
 // DEMO_NOW pins the clock exactly (tests and the eval, so runs are repeatable). CLOCK_FLOOR is for the live demo: the

@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "../lib/db";
 import { migrate } from "../lib/migrate";
+import { changeAppointment, demoIdentities, verifyCaller } from "../lib/accounts";
 import { findSlots } from "../lib/scheduling";
 import { loadSeedFromSqlite, resetLiveTables, seedOffsetDays } from "../lib/seed";
 import { pgliteDb } from "./pglite";
@@ -27,7 +28,9 @@ function buildFixture(file: string) {
     -- Overlapping siblings for one technician: 3 is booked, so 4 (13:00-17:00) must never be offered.
     INSERT INTO appointment_slots VALUES (3, '2026-10-29', '12:00-16:00', 1, 'central', 'hvac_repair', 'booked');
     INSERT INTO appointment_slots VALUES (4, '2026-10-29', '13:00-17:00', 1, 'central', 'hvac_repair', 'open');
-    INSERT INTO appointments VALUES (1, 3, 'FIX-1', 'synthetic', '2026-10-01', 'scheduled', 0);`);
+    INSERT INTO appointments VALUES (1, 3, 'FIX-1', 'synthetic', '2026-10-01', 'scheduled', 0);
+    -- Taken by the synthetic RAIL-1 demo customer that each reset books.
+    INSERT INTO appointment_slots VALUES (5, '2026-10-20', '08:00-12:00', 1, 'central', 'hvac_repair', 'open');`);
   s.close();
 }
 
@@ -55,6 +58,10 @@ describe("scheduling on a synthetic fixture", () => {
     expect(ids).toContain(1);
   });
 
+  it("ignores an impossible on_or_after date instead of failing the turn", async () => {
+    await expect(findSlots(d, { zone: "central", service_type: "hvac_repair", on_or_after: "2026-11-31" })).resolves.toBeInstanceOf(Array);
+  });
+
   it("rejects an overlapping booking at the database level", async () => {
     await expect(d.query(`INSERT INTO appointments (slot_id, customer_id) VALUES (4, 'FIX-1')`)).rejects.toMatchObject({ code: "23P01" });
   });
@@ -68,10 +75,28 @@ describe("scheduling on a synthetic fixture", () => {
       const { rows } = await d.query<{ day: string; dow: number; t: string }>(`SELECT to_char(slot_date,'YYYY-MM-DD') AS day,
         extract(isodow FROM slot_date)::int AS dow, to_char(start_utc AT TIME ZONE 'UTC','HH24:MI') AS t FROM appointment_slots WHERE slot_id = 1`);
       expect(rows[0]).toEqual({ day: "2026-12-04", dow: 5, t: "14:00" }); // a Friday still, now on standard time
-      expect((await findSlots(d, { zone: "central", service_type: "hvac_repair" })).map((s) => s.slot_id)).toContain(1);
+      // Slot 1 now holds RAIL-1's demo visit; the Monday slot is still offered.
+      expect((await findSlots(d, { zone: "central", service_type: "hvac_repair" })).map((s) => s.slot_id)).toContain(2);
     } finally {
       process.env.DEMO_NOW = "2026-10-16T14:00:00Z";
       await resetLiveTables(d);
     }
+  });
+
+  it("lists only the synthetic 555 demo customers in the rail, each verifiable with a visit and an open invoice", async () => {
+    const ids = await demoIdentities(d);
+    expect(ids.map((i) => i.phone)).toEqual(["512-555-0101"]); // only RAIL-1's zone has a slot in this fixture
+    expect(ids.map((i) => i.phone)).not.toContain("512-555-0100");
+    expect(await verifyCaller(d, "512-555-0101", "78745")).toMatchObject({ customerId: "RAIL-1" });
+    const { rows } = await d.query<{ n: number }>(`SELECT count(*)::int AS n FROM invoices WHERE customer_id LIKE 'RAIL-%' AND balance_cents > 0`);
+    expect(rows[0].n).toBe(3);
+  });
+
+  it("lets a caller at the booking cap still cancel", async () => {
+    await d.query(`INSERT INTO sessions (session_id, role, expires_at, bookings_made) VALUES ('capped','caller', now() + interval '1 day', 99)`);
+    const { rows } = await d.query<{ id: number }>(`SELECT appointment_id::int AS id FROM appointments WHERE customer_id = 'RAIL-1'`);
+    const base = { session_id: "capped", customer_id: "RAIL-1", appointment_id: rows[0].id, service_type: "hvac_repair" as const, zone: "central" as const };
+    expect(await d.tx((q) => changeAppointment(q, { ...base, action: "reschedule", new_slot_id: 2 }, "k1"))).toEqual({ ok: false, reason: "cap_reached" });
+    expect(await d.tx((q) => changeAppointment(q, { ...base, action: "cancel" }, "k2"))).toMatchObject({ ok: true, action: "cancel" });
   });
 });

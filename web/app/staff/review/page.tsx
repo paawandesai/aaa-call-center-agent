@@ -21,7 +21,7 @@ const KIND: Record<Item["kind"], { title: string; source: string; flag: string }
   caller_feedback: { title: "Caller said it didn't help", source: "Caller thumbs-down", flag: "caller_feedback" },
   could_have_answered: { title: "Handed off for low confidence", source: "Automatic · low confidence", flag: "could_have_answered" },
   error: { title: "Turn ended in an error", source: "Automatic · error", flag: "other" },
-  booking_failed: { title: "Booking could not be completed", source: "Automatic · booking failed", flag: "other" },
+  booking_failed: { title: "Booking or change could not be completed", source: "Automatic · failed at Confirm or before", flag: "other" },
   summary_wrong: { title: "Handoff summary was wrong", source: "Staff flag · summary", flag: "other" },
   staff_could_have_answered: { title: "Assistant could have answered", source: "Staff flag · could have answered", flag: "could_have_answered" },
 };
@@ -49,6 +49,10 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
         NULL::int AS handoff_id, NULL::jsonb AS steps
       FROM events e LEFT JOIN feedback f ON f.turn_id = e.turn_id
       WHERE e.kind = 'turn' AND (f.rating = 'down' OR e.outcome = 'error' OR e.reason IN ('low_confidence','booking_failed'))
+      UNION ALL
+      -- Failures after the caller pressed Confirm (slot taken, cap reached, error) are logged by the confirm routes, not the turn.
+      SELECT 'confirm:' || e.id, e.ts, 'booking_failed', e.session_id, e.kind, e.outcome, e.outcome, NULL, NULL, e.latency_ms, NULL, NULL, NULL
+      FROM events e WHERE e.kind IN ('booking','change') AND e.outcome NOT IN ('booked','cancelled','rescheduled')
       UNION ALL
       SELECT 'handoff:' || s.handoff_id || ':' || s.flag, s.created_at,
         CASE s.flag WHEN 'summary_wrong' THEN 'summary_wrong' ELSE 'staff_could_have_answered' END,

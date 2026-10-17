@@ -33,7 +33,7 @@ def _env_path(name: str) -> Path:
 
 KB = _env_path("MERIDIAN_DATA_DIR") / "knowledge_base"
 OUT = _env_path("MERIDIAN_KB_OUT")
-EMBED_MODEL = "BAAI/bge-small-en-v1.5"
+EMBED_MODEL = "BAAI/bge-small-en-v1.5"  # fastembed fetches its default revision (not pinned); offline comparison only. The app pins its weights in web/lib/config.ts.
 QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 TOKEN = re.compile(r"[a-z0-9$%]+")
 STOP = set("a an the is are am i my me you your we our to of for on in and or it its do does did can how what when much that this be with at there have has".split())

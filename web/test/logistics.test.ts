@@ -3,7 +3,7 @@ import { isLogistics } from "../lib/agent";
 
 describe("isLogistics (turns that skip the KB search)", () => {
   it("matches bare booking answers", () => {
-    for (const t of ["78745", "My ZIP is 78745.", "Jordan Lee", "It's Sam", "I'll take Monday, October 19, 1 pm to 5 pm (slot_id 63).", "512-296-6991, 78664", "512-511-4814, ZIP 78664", "My phone number is 512-296-6991 and my ZIP is 78664."]) expect(isLogistics(t)).toBe(true);
+    for (const t of ["78745", "My ZIP is 78745.", "Jordan Lee", "It's Sam", "I'll take Monday, October 19, 1 pm to 5 pm (slot_id 63).", "512-555-0142, 78664", "512-555-0187, ZIP 78664", "My phone number is 512-555-0142 and my ZIP is 78664."]) expect(isLogistics(t)).toBe(true);
   });
   it("leaves real questions to retrieval", () => {
     for (const t of ["What's your diagnostic fee?", "Do you service 78734?", "my furnace won't turn on", "How much is a tune-up for 78745 Austin?"]) expect(isLogistics(t)).toBe(false);

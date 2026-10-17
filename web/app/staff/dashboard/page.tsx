@@ -11,7 +11,7 @@ export const metadata = { title: "Live traffic" };
 
 // Everything here comes from first-party metadata (no chat text). This page never calls the model.
 const RANGES: [string, string, number][] = [["24h", "24 h", 1], ["7d", "7 days", 7], ["30d", "30 days", 30]];
-const INTENDED = new Set(["safety", "billing_account", "cancel_reschedule", "complaint", "human_requested", "service_area_unclear", "out_of_scope"]);
+const INTENDED = new Set(["safety", "adversarial", "billing_account", "cancel_reschedule", "complaint", "human_requested", "service_area_unclear", "out_of_scope"]);
 const fmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const when = (d: Date | string | null) => (d ? fmt.format(new Date(d)) : "never");
 

@@ -64,12 +64,15 @@ const AVAILABLE = `
 const SLOT_COLS = `s.slot_id, to_char(s.slot_date, 'YYYY-MM-DD') AS date, s."window" AS window,
   s.start_utc::text AS start_utc, s.end_utc::text AS end_utc, s.tech_id`;
 
+// YYYY-MM-DD that names a real day ("2026-11-31" would make the ::date cast throw).
+const isRealDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(`${s}T00:00:00Z`).toISOString().startsWith(s);
+
 export async function findSlots(
   q: Queryable,
   args: { zone: Zone; service_type: ServiceType; on_or_after?: string; part_of_day?: "morning" | "afternoon" | "evening" | "any" },
 ): Promise<Slot[]> {
   const earliest = new Date(now().getTime() + LEAD_MINUTES * 60_000).toISOString();
-  const from = args.on_or_after && /^\d{4}-\d{2}-\d{2}$/.test(args.on_or_after) ? args.on_or_after : "1970-01-01";
+  const from = args.on_or_after && isRealDate(args.on_or_after) ? args.on_or_after : "1970-01-01";
   const windows =
     args.part_of_day === "morning" ? ["08:00-12:00"]
     : args.part_of_day === "afternoon" ? ["12:00-16:00", "13:00-17:00"]

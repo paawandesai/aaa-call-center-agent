@@ -266,7 +266,7 @@ export function Chat({ role = "caller", demoIds = [] }: { role?: "caller" | "sta
           {demoIds.length > 0 && (
             <section className="card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <span className="label">Demo accounts to try</span>
-              <span className="small muted">Made-up customers from the test database. Give the assistant the phone number and ZIP when it asks.</span>
+              <span className="small muted">Made-up customers (555 numbers) added to the test database for this demo. Give the assistant the phone number and ZIP when it asks.</span>
               <ul style={{ margin: 0, paddingLeft: 18 }}>
                 {demoIds.map((d) => <li key={d.phone}><span className="mono small">{d.phone} · {d.zip}</span> <span className="small muted">({d.first_name}, {d.has})</span></li>)}
               </ul>

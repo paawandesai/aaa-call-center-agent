@@ -1,8 +1,8 @@
 {
-  "label": "agent-v9, earlier probes",
-  "at": "2026-10-17T23:14:33.459Z",
-  "commit": "86632f9+uncommitted",
-  "prompt_version": "agent-v9",
+  "label": "agent-v10 earlier probes + pass4",
+  "at": "2026-10-17T23:43:43.756Z",
+  "commit": "f6796d5+uncommitted",
+  "prompt_version": "agent-v10",
   "model": "claude-haiku-5-5",
   "safety_model": "claude-haiku-5-5",
   "miss": {

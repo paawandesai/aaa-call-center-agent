@@ -104,7 +104,8 @@ export async function changeAppointment(tx: Queryable, p: PendingChange, idempot
 
   const sess = await tx.query<{ bookings_made: number }>(`SELECT bookings_made FROM sessions WHERE session_id = $1 FOR UPDATE`, [p.session_id]);
   if (!sess.rows[0]) return { ok: false, reason: "error" };
-  if (sess.rows[0].bookings_made >= config.bookingsPerSession) return { ok: false, reason: "cap_reached" };
+  // Cancelling frees a slot, so only reschedules count toward the cap.
+  if (p.action !== "cancel" && sess.rows[0].bookings_made >= config.bookingsPerSession) return { ok: false, reason: "cap_reached" };
 
   let ref = `MHC-A${p.appointment_id}`;
   let when = whenLabel(o.date, o.window);
@@ -126,18 +127,19 @@ export async function changeAppointment(tx: Queryable, p: PendingChange, idempot
   // The old slot opens again only if no other live appointment holds it.
   await tx.query(`UPDATE appointment_slots SET status = 'open' WHERE slot_id = $1 AND status = 'booked'
     AND NOT EXISTS (SELECT 1 FROM appointments WHERE slot_id = $1 AND status = 'scheduled')`, [o.slot_id]);
-  await tx.query(`UPDATE sessions SET bookings_made = bookings_made + 1 WHERE session_id = $1`, [p.session_id]);
+  if (p.action !== "cancel") await tx.query(`UPDATE sessions SET bookings_made = bookings_made + 1 WHERE session_id = $1`, [p.session_id]);
   return { ok: true, replayed: false, action: p.action, ref, when_label: when, old_when_label: whenLabel(o.date, o.window), service };
 }
 
-// Synthetic demo identities shown in the chat rail so visitors can try account features.
+// The synthetic RAIL- customers (lib/seed.ts) shown in the chat rail so visitors can try account features. Partner
+// customers are never listed.
 export async function demoIdentities(q: Queryable, n = 3): Promise<{ first_name: string; phone: string; zip: string; has: string }[]> {
   const { rows } = await q.query<{ name: string; phone: string; zip: string; appts: number; bal: number }>(
     `SELECT c.name, c.phone, c.zip,
        (SELECT count(*)::int FROM appointments a JOIN appointment_slots s ON s.slot_id = a.slot_id
           WHERE a.customer_id = c.customer_id AND a.status = 'scheduled' AND s.start_utc > $1::timestamptz + interval '1 day') AS appts,
        (SELECT coalesce(sum(balance_cents),0)::int FROM invoices i WHERE i.customer_id = c.customer_id) AS bal
-     FROM customers c WHERE c.created_by_session IS NULL ORDER BY c.customer_id`, [now().toISOString()]);
+     FROM customers c WHERE c.customer_id LIKE 'RAIL-%' ORDER BY c.customer_id`, [now().toISOString()]);
   const pick = rows.filter((r) => r.appts > 0 && r.bal > 0).slice(0, n);
   return pick.map((r) => ({ first_name: r.name.split(" ")[0], phone: r.phone, zip: r.zip, has: "an upcoming visit and an open invoice" }));
 }

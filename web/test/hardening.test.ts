@@ -3,6 +3,7 @@ import { getConversation } from "../lib/conversations";
 import type { Db } from "../lib/db";
 import { createHandoff } from "../lib/handoffs";
 import { migrate } from "../lib/migrate";
+import { costUsd } from "../lib/pricing";
 import { ipBucket } from "../lib/ratelimit";
 import { pgliteDb } from "./pglite";
 
@@ -47,5 +48,13 @@ describe("handoff tickets", () => {
     c.clientIp = "198.51.100.9";
     expect("id" in (await createHandoff(d, c, "safety", "x", "I smell gas", "policy"))).toBe(true);
     expect(await count()).toBe(1 + 5 + 1);
+  });
+});
+
+describe("pricing fallback", () => {
+  it("prices an unknown model at the most expensive row, so the spend cap errs high", () => {
+    const u = { input: 1_000_000, cacheRead: 0, cacheWrite: 0, output: 1_000_000 };
+    expect(costUsd("claude-some-future-model", u)).toBe(costUsd("claude-fable-5-1", u));
+    expect(costUsd("claude-fable-5-1", u)).toBe(60);
   });
 });

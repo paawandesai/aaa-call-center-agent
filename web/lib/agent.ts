@@ -528,6 +528,8 @@ async function runTool(
         const o = c.offered.get(p.data.new_slot_id);
         if (!o) return bad("That new_slot_id was not offered in this conversation. Call check_availability first, with the appointment's service_type and the caller's ZIP.");
         // Zone comes from the caller's ZIP (check_availability), not the old slot: the mock data's slot zones don't follow customer addresses.
+        // It must be the verified account's zone, so a slot offered for some other ZIP can't move this caller's visit there.
+        if (c.verified.zone && o.zone !== c.verified.zone) return bad(`That new time is in a different service zone from the account's address. Call check_availability again with the account's ZIP (${c.verified.zip}).`);
         if (o.service_type !== appt.service_type) return bad(`The new time must be for the same service_type as the appointment (${appt.service_type}). Call check_availability again with service_type ${appt.service_type}.`);
         const still = await isSlotAvailable(deps.db, o.slot_id, o.zone, o.service_type);
         if (!still) return { content: JSON.stringify({ result: "slot_taken", note: "Call check_availability again." }) };
