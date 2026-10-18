@@ -1,17 +1,17 @@
 {
- "run_id": "20261017T1836-6adc",
- "created_at": "2026-10-17T18:36:00.574Z",
- "config_id": "a9a0024562",
- "prompt_version": "agent-v5",
+ "run_id": "20261018T1710-24b9",
+ "created_at": "2026-10-18T17:10:09.603Z",
+ "config_id": "464e05f6f5",
+ "prompt_version": "agent-v11",
  "split": "the September 2026 calls (100 calls)",
- "note": "Booking cases whose zone had no openings for that service in the mock schedule are scored as correct handoffs. Estimated model cost for the run: about $0.05. Earlier held-out runs: 29 of 100 and 37 of 100 (agent-v1, before and after three harness fixes), 37 of 100 (agent-v2), 45 of 100 (agent-v3), 64 of 100 (agent-v4). No run is fully clean: everything before agent-v3 was tuned with held-out results in view, and later runs were tuned on a separate July\u2013August dev set but still informed by earlier held-out results; agent-v4 also widened scope to verified account lookups and appointment changes, which moved those calls from 'escalate' to 'handle'; agent-v5 also changed how the simulated caller behaves (see README).",
+ "note": "Booking cases whose zone had no openings for that service in the mock schedule are scored as correct handoffs. Estimated model cost for the run: about $0.10. This is held-out invocation 10. Earlier full runs: 29 of 100 (agent-v1), 37 of 100 (agent-v1), 37 of 100 (agent-v1), 45 of 100 (agent-v3), 64 of 100 (agent-v4), 69 of 100 (agent-v5); plus 3 partial or adversarial-only invocations (eval/results/holdout_invocations.jsonl). No run is clean: early prompts were tuned with held-out results in view, later ones on a separate July\u2013August dev set but still informed by earlier held-out results; agent-v4 widened scope to verified account lookups and appointment changes, and agent-v5 changed how the simulated caller behaves (see README).",
  "containment": {
-  "k": 69,
+  "k": 66,
   "n": 100,
-  "rate": 0.69,
+  "rate": 0.66,
   "ci": [
-   0.5937376052204429,
-   0.7722043679386762
+   0.5627754565831095,
+   0.74538620502457
   ]
  },
  "ceiling": {
@@ -28,22 +28,110 @@
   0.75
  ],
  "accuracy": {
-  "k": 69,
+  "k": 66,
   "n": 69,
-  "rate": 1,
+  "rate": 0.9565217391304348,
   "ci": [
-   0.9472609058559944,
-   1
+   0.8797860261535665,
+   0.9851043661497328
   ]
+ },
+ "kept_accuracy": {
+  "k": 66,
+  "n": 68,
+  "rate": 0.9705882352941176,
+  "ci": [
+   0.8989517657574696,
+   0.9918969903949547
+  ]
+ },
+ "retrieval_holdout": {
+  "hit1": {
+   "k": 10,
+   "n": 11,
+   "rate": 0.9090909090909091,
+   "ci": [
+    0.6226353745137962,
+    0.9837682477371741
+   ]
+  },
+  "hit5": {
+   "k": 11,
+   "n": 11,
+   "rate": 1,
+   "ci": [
+    0.7411599827511859,
+    1
+   ]
+  },
+  "mrr": 0.9393939393939393,
+  "cases": [
+   {
+    "id": "71e51d2ab6",
+    "intent": "membership_upgrade",
+    "rank": 1
+   },
+   {
+    "id": "cb088b9ecb",
+    "intent": "warranty_coverage",
+    "rank": 1
+   },
+   {
+    "id": "51896daade",
+    "intent": "membership_renewal",
+    "rank": 1
+   },
+   {
+    "id": "6ab24c93d7",
+    "intent": "warranty_coverage",
+    "rank": 1
+   },
+   {
+    "id": "e77b269ab1",
+    "intent": "membership_info",
+    "rank": 1
+   },
+   {
+    "id": "6b9d326586",
+    "intent": "membership_info",
+    "rank": 1
+   },
+   {
+    "id": "92b859b98b",
+    "intent": "membership_info",
+    "rank": 3
+   },
+   {
+    "id": "0db8d78778",
+    "intent": "membership_renewal",
+    "rank": 1
+   },
+   {
+    "id": "b517d681b1",
+    "intent": "membership_renewal",
+    "rank": 1
+   },
+   {
+    "id": "833e25975d",
+    "intent": "membership_info",
+    "rank": 1
+   },
+   {
+    "id": "48444dd5e7",
+    "intent": "membership_info",
+    "rank": 1
+   }
+  ],
+  "where": "app query on pgvector (PGlite), September knowledge-base questions (redacted openings, not committed)"
  },
  "escalation": {
   "precision": {
    "k": 31,
-   "n": 31,
-   "rate": 1,
+   "n": 32,
+   "rate": 0.96875,
    "ci": [
-    0.889740999265246,
-    0.9999999999999999
+    0.8425539219962727,
+    0.9944622826374491
    ]
   },
   "recall": {
@@ -66,11 +154,11 @@
   ]
  },
  "adversarial": {
-  "k": 22,
-  "n": 22,
+  "k": 46,
+  "n": 46,
   "rate": 1,
   "ci": [
-   0.8513404742740388,
+   0.9229238226702192,
    1
   ]
  },
@@ -93,7 +181,7 @@
     0.992606734645195
    ]
   },
-  "mrr": 0.8347222222222223,
+  "mrr": 0.813888888888889,
   "where": "app query on pgvector (PGlite), dev set"
  },
  "per_driver": [
@@ -116,9 +204,13 @@
   {
    "driver": "Existing appointment",
    "n": 12,
-   "contained": 11,
-   "correct": 12,
-   "failed": [],
+   "contained": 8,
+   "correct": 9,
+   "failed": [
+    "6abed0bbb3",
+    "8edb1154ef",
+    "f49855c5b7"
+   ],
    "expected": "Answered or Verified and changed or Escalated"
   },
   {
@@ -170,5 +262,34 @@
    "expected": "Booked or Answered or Escalated"
   }
  ],
- "failures": []
+ "failures": [
+  {
+   "id": "6abed0bbb3",
+   "driver": "Existing appointment",
+   "expected": "changed",
+   "got": "answered",
+   "checks": [
+    "expected a confirmed cancel, got answered"
+   ]
+  },
+  {
+   "id": "8edb1154ef",
+   "driver": "Existing appointment",
+   "expected": "changed",
+   "got": "handoff:cancel_reschedule",
+   "checks": [
+    "claimed a change without a DB write",
+    "expected a confirmed cancel, got handoff (cancel_reschedule)"
+   ]
+  },
+  {
+   "id": "f49855c5b7",
+   "driver": "Existing appointment",
+   "expected": "changed",
+   "got": "answered",
+   "checks": [
+    "expected a confirmed reschedule, got answered"
+   ]
+  }
+ ]
 }

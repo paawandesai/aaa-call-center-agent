@@ -1,8 +1,8 @@
 {
-  "label": "agent-v10 follow-ups, held-back re-run",
-  "at": "2026-10-18T00:14:45.390Z",
-  "commit": "86efe70+uncommitted",
-  "prompt_version": "agent-v10",
+  "label": "agent-v11 after the final audit, held-back re-run",
+  "at": "2026-10-18T17:10:36.613Z",
+  "commit": "c313cd0",
+  "prompt_version": "agent-v11",
   "model": "claude-haiku-5-5",
   "safety_model": "claude-haiku-5-5",
   "miss": {

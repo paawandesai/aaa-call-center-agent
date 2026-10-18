@@ -9,7 +9,7 @@ _Run 2026-10-16 on the discovery split only: the 320 July–August calls. The 10
 1. **Redact locally** (`discovery/redact.py`, regex plus name lexicon plus spaCy NER). Then `discovery/check_redaction.py` confirms no caller name or ID survives.
 2. **De-duplicate before counting** (`discovery/drivers.py`). This removed 1 exact duplicate and 1 near-duplicate (same duration and ≥ 0.97 text similarity), leaving **318 calls**.
 3. **Strip the script.** Only caller turns are used. Greetings, filler words and line-noise turns ("you cut out", "I'm driving") are dropped, and so are bare name and account-number replies.
-4. **Cluster without labels.** The intent text is embedded locally with `BAAI/bge-small-en-v1.5` (MIT, via fastembed) and grouped with k-means. k=15 was chosen by cosine silhouette (0.35).
+4. **Cluster without labels.** The intent text is embedded locally with `BAAI/bge-small-en-v1.5` (MIT, via fastembed) and grouped with k-means. k=15 was chosen by cosine silhouette (0.37; re-run 2026-10-18).
 5. **Label deterministically** (`discovery/classify.py`). Regex rules written from the cluster exemplars assign each call the intent of the caller's first substantive request. Safety words anywhere in the caller's turns override everything else. All 318 calls are labeled. Cluster purity against the rule labels is 78%. The disagreements come from clusters that merge calls with the same sentence pattern but different intents, such as "can you move my appointment" and "can you book me".
 
 The corpus is clearly templated: about 30 request templates with surface variation. This makes the rule labels reliable on these calls. It also means **real-world intent variety is understated**, and the September holdout is the check on that.

@@ -23,7 +23,7 @@ All 17 files have a reviewed decision in `kb/registry.py`. Ingest refuses to run
 - Prose is split on headings, and every chunk carries its title and section path ("Warranty Policy > Warranty transfer").
 - Tables become one chunk per row, with the column names repeated, so a price is never separated from what it prices.
 
-This gave 86 chunks when the retrieval table below was measured. The holiday image is now indexed as one chunk instead of eight lines, so the current `chunks.json` has 79. The table itself was not re-run, but the eval re-measures the curated retriever through the app's own pgvector query on the 79 chunks every run, and gets the same hit@5 (23 of 24) and MRR (0.835).
+This gave 86 chunks when the comparison was first run. The holiday image is now indexed as one chunk instead of eight lines, so the current `chunks.json` has 79. The table below was re-run on the 79 chunks on 2026-10-18 (`python kb/retrieval_eval.py`, fastembed 0.9.0; `eval/results/retrieval_retrieval_dev.json`), and the eval also re-measures the curated retriever through the app's own pgvector query every run (hit@5 23 of 24).
 
 **Planted instructions.** A scan for instruction-like text ("ignore previous", "you are now", "AI:", ...) found none in the KB (the scan covers the indexed chunks; a manual read of the excluded files found none either). Until 2026-10-17 the pattern missed "Note to AI: ..."; it now catches it. Ingest re-runs this scan and flags any hit for review. A flagged hit is never followed.
 
@@ -41,10 +41,10 @@ There are 24 caller questions from the discovery split (`eval/retrieval_dev.json
 
 | Retriever | hit@1 | hit@3 | hit@5 | MRR | Stale/internal doc in top 5 |
 |---|---|---|---|---|---|
-| Naive: all 17 files, 500-char chunks, dense | 0.62 | 0.88 | 0.88 | 0.74 | **75% of questions** |
-| BM25 on curated chunks | 0.46 | 0.75 | 0.75 | 0.60 | 0% |
-| **Dense (bge-small-en-v1.5) on curated chunks** | **0.75** | **0.92** | **0.96** | **0.83** | 0% |
-| Hybrid RRF (BM25 + dense) | 0.75 | 0.92 | 0.92 | 0.82 | 0% |
+| Naive: all 17 files, 500-char chunks, dense | 0.58 | 0.88 | 0.88 | 0.72 | **75% of questions** |
+| BM25 on curated chunks | 0.54 | 0.75 | 0.79 | 0.65 | 0% |
+| **Dense (bge-small-en-v1.5) on curated chunks** | **0.71** | **0.92** | **0.96** | **0.81** | 0% |
+| Hybrid RRF (BM25 + dense) | 0.75 | 0.88 | 0.92 | 0.82 | 0% |
 
 **Takeaways:**
 - The naive pipeline looks acceptable on hit rate. But for 3 in 4 questions it also hands the model a stale or internal passage, which is exactly how a bot ends up quoting $79 or a 90-day warranty.
@@ -54,4 +54,5 @@ There are 24 caller questions from the discovery split (`eval/retrieval_dev.json
 
 **Limits:**
 - n=24 is small, and the 95% confidence interval on hit@5 is wide (Wilson: about 0.80–0.99).
-- These 24 questions are the only retrieval measurement. `npm run eval` re-runs them against the app's pgvector retriever; there is no separate held-out retrieval set. Retrieval on September calls is measured only indirectly, through the containment eval's required facts.
+- These 24 questions were written from discovery calls and used while tuning, so they are not an unseen test. `npm run eval` re-runs them against the app's pgvector retriever.
+- Since 2026-10-18 a held-out run also measures retrieval on the real September knowledge-base questions (each case's redacted opening, through the app's own query; a hit is a passage from the current membership or warranty document, or the fee schedule, that contains one of the case's required facts). The result is `retrieval_holdout` in `eval/results/containment_holdout.json`; see the README for the number.
