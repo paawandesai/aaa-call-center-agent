@@ -5,9 +5,10 @@ import { DatabaseSync } from "node:sqlite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "../lib/db";
 import { migrate } from "../lib/migrate";
-import { changeAppointment, demoIdentities, verifyCaller } from "../lib/accounts";
+import { changeAppointment, demoIdentities, lateFee, verifyCaller } from "../lib/accounts";
 import { findSlots } from "../lib/scheduling";
 import { loadSeedFromSqlite, resetLiveTables, seedOffsetDays } from "../lib/seed";
+import { maybeNightlyReset } from "../lib/reset";
 import { pgliteDb } from "./pglite";
 
 // The DST and double-booking checks on a tiny synthetic database built here, so they run in CI without the partner's data.
@@ -101,5 +102,72 @@ describe("scheduling on a synthetic fixture", () => {
     // A card shown before a reset names the visit by its old date; the same id now points at a different visit.
     expect(await d.tx((q) => changeAppointment(q, { ...base, action: "cancel", date: "2020-01-01" }, "k0"))).toEqual({ ok: false, reason: "not_found" });
     expect(await d.tx((q) => changeAppointment(q, { ...base, action: "cancel" }, "k2"))).toMatchObject({ ok: true, action: "cancel" });
+  });
+});
+
+describe("past slots, closed days and the late fee (final audit, 2026-10-18)", () => {
+  let d: Db;
+  let dir: string;
+  const add = (id: number, date: string, window: string) => d.query(`INSERT INTO appointment_slots
+      (slot_id, slot_date, "window", tech_id, zone, service_type, status, start_utc, end_utc)
+    VALUES ($1, $2::date, $3, 1, 'central', 'hvac_repair', 'open',
+      ($2::date + split_part($3, '-', 1)::time) AT TIME ZONE 'America/Chicago',
+      ($2::date + split_part($3, '-', 2)::time) AT TIME ZONE 'America/Chicago')`, [id, date, window]);
+  const offered = async (on: string) =>
+    (await findSlots(d, { zone: "central", service_type: "hvac_repair", on_or_after: on })).filter((s) => s.date === on).map((s) => s.slot_id);
+  beforeAll(async () => {
+    dir = mkdtempSync(path.join(tmpdir(), "meridian-fixture-"));
+    const file = path.join(dir, "fixture.sqlite");
+    buildFixture(file);
+    d = await pgliteDb();
+    await migrate(d);
+    await loadSeedFromSqlite(d, file);
+    await add(101, "2026-10-16", "08:00-12:00"); // already started at the pinned clock (9 am Central)
+    await add(102, "2026-10-16", "16:00-19:00"); // later the same day
+    await add(103, "2026-11-26", "08:00-12:00"); // Thanksgiving
+    await add(104, "2026-12-24", "08:00-12:00"); // Christmas Eve morning
+    await add(105, "2026-12-24", "12:00-16:00"); // Christmas Eve afternoon: closed
+  });
+  afterAll(async () => { await d?.close(); rmSync(dir, { recursive: true, force: true }); });
+
+  it("never offers a slot that has started or starts within the lead time", async () => {
+    expect(await offered("2026-10-16")).toEqual([102]);
+  });
+
+  it("never offers a holiday closure, and only the morning on Christmas Eve", async () => {
+    expect(await offered("2026-11-26")).toEqual([]);
+    expect(await offered("2026-12-24")).toEqual([104]);
+  });
+
+  it("purges events, feedback, reviews, staff flags and spend totals after 30 days, and handoffs after 7", async () => {
+    const old = "now() - interval '31 days'", week = "now() - interval '8 days'";
+    await d.query(`INSERT INTO events (ts, session_id, kind) VALUES (${old}, 'p-old', 'turn'), (now(), 'p-new', 'turn')`);
+    await d.query(`INSERT INTO feedback (created_at, session_id, rating) VALUES (${old}, 'p-old', 'down'), (now(), 'p-new', 'down')`);
+    await d.query(`INSERT INTO reviews (created_at, turn_id, flag, decision) VALUES (${old}, 'p-old', 'other', 'agree'), (now(), 'p-new', 'other', 'agree')`);
+    await d.query(`INSERT INTO staff_flags (created_at, handoff_id, flag) VALUES (${old}, 9001, 'summary_wrong'), (now(), 9002, 'summary_wrong')`);
+    await d.query(`INSERT INTO handoffs (session_id, reason, summary, created_at) VALUES ('p-old','complaint','x', ${week}), ('p-new','complaint','y', now())`);
+    await d.query(`INSERT INTO app_meta (key, value) VALUES ('spend:' || to_char(${old}, 'YYYY-MM-DD'), '1'), ('spend:' || to_char(now(), 'YYYY-MM-DD'), '1')
+      ON CONFLICT (key) DO NOTHING`);
+    await d.query(`INSERT INTO app_meta (key, value) VALUES ('last_reset', (now() - interval '2 days')::text)
+      ON CONFLICT (key) DO UPDATE SET value = excluded.value`);
+    process.env.DEMO_ACTIVITY = "0";
+    try {
+      expect(await maybeNightlyReset(d)).toBe(true);
+    } finally {
+      delete process.env.DEMO_ACTIVITY;
+    }
+    const left = async (sql: string) => (await d.query<{ n: number }>(sql)).rows[0].n;
+    expect(await left(`SELECT count(*)::int AS n FROM events WHERE session_id = 'p-old'`)).toBe(0);
+    expect(await left(`SELECT count(*)::int AS n FROM events WHERE session_id = 'p-new'`)).toBe(1);
+    expect(await left(`SELECT count(*)::int AS n FROM feedback WHERE session_id LIKE 'p-%'`)).toBe(1);
+    expect(await left(`SELECT count(*)::int AS n FROM reviews WHERE turn_id LIKE 'p-%'`)).toBe(1);
+    expect(await left(`SELECT count(*)::int AS n FROM staff_flags WHERE handoff_id IN (9001, 9002)`)).toBe(1);
+    expect(await left(`SELECT count(*)::int AS n FROM handoffs WHERE session_id LIKE 'p-%'`)).toBe(1);
+    expect(await left(`SELECT count(*)::int AS n FROM app_meta WHERE key = 'spend:' || to_char(now() - interval '31 days', 'YYYY-MM-DD')`)).toBe(0);
+  });
+
+  it("charges the late fee only inside 24 hours of the window", () => {
+    expect(lateFee("2026-10-17T13:00:00Z")).toMatch(/\$49/); // 23 hours away
+    expect(lateFee("2026-10-17T15:00:00Z")).toBeNull(); // 25 hours away
   });
 });

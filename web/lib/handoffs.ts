@@ -15,7 +15,9 @@ export type HandoffResult = { id: number; position: number } | { suppressed: tru
 
 export async function createHandoff(q: Queryable, c: Conversation, reason: HandoffReason, summary: string, lastCallerText: string,
   source: "model" | "policy" = "model"): Promise<HandoffResult> {
-  const text = `${source === "model" ? "AI-written: " : ""}${redact(summary)}\nCaller's last message (redacted): ${redact(lastCallerText).slice(0, 300)}`;
+  // One line each, so neither the model's summary nor the caller's words can forge the separators the staff page splits on.
+  const oneLine = (s: string) => s.replace(/\s*[\r\n]+\s*/g, " ");
+  const text = `${source === "model" ? "AI-written: " : ""}${oneLine(redact(summary))}\nCaller's last message (redacted): ${oneLine(redact(lastCallerText)).slice(0, 300)}`;
   const { rows: open } = await q.query<{ id: number; position: number }>(
     `UPDATE handoffs h SET summary = left(h.summary || E'\n---\nLater, in the same session:\n' || $3, $4)
      WHERE h.id = (SELECT id FROM handoffs WHERE session_id = $1 AND reason = $2 AND status = 'open' AND created_at > now() - interval '1 day'

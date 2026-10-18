@@ -19,4 +19,4 @@ test:
     - cd web
     - npm ci
     - npm run typecheck
-    - npm test
+    - npm run coverage

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { db } from "@/lib/db";
 import { allow, clientIp } from "@/lib/ratelimit";
 import { requireSession } from "@/lib/session";
 import { record } from "@/lib/telemetry";
@@ -15,6 +16,11 @@ export async function POST(req: Request) {
   if (!allow(`tel:${s.id}`, 60, 60_000).ok || !allow(`telip:${clientIp(req)}`, 120, 60_000).ok) return new Response(null, { status: 429 });
   const b = Body.safeParse(await req.json().catch(() => null));
   if (!b.success) return new Response(null, { status: 400 });
+  // Only for a turn this session actually ran, and once per turn, so a client can't pad the latency numbers.
+  const { rows } = await db().query(`SELECT
+      EXISTS (SELECT 1 FROM events WHERE session_id = $1 AND turn_id = $2 AND kind IN ('turn', 'capacity')) AS ran,
+      EXISTS (SELECT 1 FROM events WHERE session_id = $1 AND turn_id = $2 AND kind = 'client_timing') AS seen`, [s.id, b.data.turn_id]);
+  if (!rows[0]?.ran || rows[0]?.seen) return new Response(null, { status: 204 });
   await record({ session_id: s.id, turn_id: b.data.turn_id, kind: "client_timing", first_token_ms: b.data.ttft_ms,
     latency_ms: b.data.total_ms, meta: { interrupted: b.data.interrupted ?? false } });
   return new Response(null, { status: 204 });

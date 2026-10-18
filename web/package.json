@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:setup": "tsx scripts/setup_db.ts",
-    "eval": "tsx scripts/run_eval.ts"
+    "eval": "tsx scripts/run_eval.ts",
+    "coverage": "vitest run --coverage --coverage.include=lib --coverage.include=app"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
@@ -23,6 +24,7 @@
     "@types/node": "22.20.5",
     "@types/pg": "8.23.1",
     "@types/react": "19.3.0",
+    "@vitest/coverage-v8": "5.0.5",
     "typescript": "5.9.3",
     "vitest": "5.0.5"
   },

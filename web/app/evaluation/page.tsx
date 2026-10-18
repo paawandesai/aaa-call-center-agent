@@ -14,8 +14,9 @@ export const metadata = { title: "Evaluation" };
 interface Rate { k: number; n: number; rate: number; ci: [number, number] }
 interface Results {
   run_id: string; created_at: string; config_id: string; prompt_version: string; split: string; note?: string;
-  containment: Rate; ceiling: Rate; target: [number, number]; accuracy: Rate;
+  containment: Rate; ceiling: Rate; target: [number, number]; accuracy: Rate; kept_accuracy?: Rate;
   escalation: { precision: Rate; recall: Rate }; retrieval?: { hit5: Rate; mrr: number; where: string };
+  retrieval_holdout?: { hit1: Rate; hit5: Rate; mrr: number };
   adversarial: Rate; probes?: Rate; safety: Rate;
   per_driver: { driver: string; expected: string; n: number; contained: number; correct: number; failed: string[] }[];
   failures: { id: string; driver: string; expected: string; got: string; checks: string[] }[];
@@ -61,7 +62,7 @@ export default async function Evaluation() {
         <div className="stack-8" style={{ maxWidth: 760 }}>
           <span className="label">Eval run {r.run_id} · {r.created_at.slice(0, 10)} · config {r.config_id} · prompt {r.prompt_version}</span>
           <h1 className="h1">How well the assistant does on held-out calls</h1>
-          <p className="muted" style={{ margin: 0 }}>The test set is {r.split}, held out before call-driver discovery; each caller's opening line is verbatim from the redacted transcript, and a simulated caller answers the follow-up questions. Each item is scored by code: question calls against facts from the current knowledge base, account calls against the assigned customer's records, bookings and changes against the database. No AI grades the AI. These numbers are for prompt {r.prompt_version}. The deployed prompt is {config.promptVersion}, which has been measured on the dev set and the adversarial set only (see the README).</p>
+          <p className="muted" style={{ margin: 0 }}>The test set is {r.split}, held out before call-driver discovery; each caller's opening line is verbatim from the redacted transcript, and a simulated caller answers the follow-up questions. Each item is scored by code: question calls against facts from the current knowledge base, account calls against the assigned customer's records, bookings and changes against the database. No AI grades the AI. These numbers are for prompt {r.prompt_version}{r.prompt_version === config.promptVersion ? ", the deployed one" : `; the deployed prompt is ${config.promptVersion} (see the README)`}.</p>
           {r.note && <p style={{ margin: 0 }}>{r.note}</p>}
         </div>
 
@@ -89,10 +90,12 @@ export default async function Evaluation() {
         </section>
 
         <div className="tiles" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
-          <section className="tile"><span className="label">Accuracy on handled drivers</span><span className="value">{pct(r.accuracy.rate)}</span><span className="small muted">Right outcome, required facts present, no stale values · {ci(r.accuracy)}</span></section>
+          <section className="tile"><span className="label">Accuracy on handled drivers</span><span className="value">{pct(r.accuracy.rate)}</span><span className="small muted">Right outcome, required facts present, no stale values, over the calls the agent may handle (so it equals containment ÷ ceiling) · {ci(r.accuracy)}</span></section>
+          {r.kept_accuracy && <section className="tile"><span className="label">Right when it kept the call</span><span className="value">{pct(r.kept_accuracy.rate)}</span><span className="small muted">Of the calls the agent answered, booked or changed without a handoff, the share that passed every check · {ci(r.kept_accuracy)}</span></section>}
+          {r.retrieval_holdout && <section className="tile"><span className="label">Retrieval on held-out questions · hit@5</span><span className="value">{pct(r.retrieval_holdout.hit5.rate)}</span><span className="small muted">September knowledge-base questions through the app&apos;s own search; a hit is a current-document passage holding a required fact · hit@1 {pct(r.retrieval_holdout.hit1.rate)} · MRR {r.retrieval_holdout.mrr.toFixed(2)} · {ci(r.retrieval_holdout.hit5)}</span></section>}
           <section className="tile"><span className="label">Escalation precision / recall</span><span className="value">{pct(r.escalation.precision.rate)} / {pct(r.escalation.recall.rate)}</span><span className="small muted">Handed off when it should ({r.escalation.recall.k} of {r.escalation.recall.n}), and only then ({r.escalation.precision.k} of {r.escalation.precision.n})</span></section>
           {r.retrieval && <section className="tile"><span className="label">Retrieval · hit@5</span><span className="value">{pct(r.retrieval.hit5.rate)}</span><span className="small muted">Dev set, n={r.retrieval.hit5.n}, not the held-out calls · measured on its own, before answers · MRR {r.retrieval.mrr.toFixed(2)} · {ci(r.retrieval.hit5)}</span></section>}
-          <section className="tile"><span className="label">Adversarial set</span><span className="value">{r.adversarial.k} of {r.adversarial.n} held</span><span className="small muted">Prompt {r.prompt_version}, before the set grew; the README has the deployed prompt&apos;s run · injection, bulk booking, other callers&apos; data, repeated asks for a person{r.probes ? ` · KB probes ${r.probes.k} of ${r.probes.n}` : ""}</span></section>
+          <section className="tile"><span className="label">Adversarial set</span><span className="value">{r.adversarial.k} of {r.adversarial.n} held</span><span className="small muted">Prompt {r.prompt_version}, synthetic attacks · injection, bulk booking, other callers&apos; data, repeated asks for a person{r.probes ? ` · KB probes ${r.probes.k} of ${r.probes.n}` : ""}</span></section>
           <section className="tile"><span className="label">Safety calls</span><span className="value">{r.safety.k} of {r.safety.n}</span><span className="small muted">Safety script shown and handed off, never booked</span></section>
         </div>
 

@@ -28,7 +28,7 @@ export const config = {
   bookingAttemptsPerIpDay: Number(process.env.BOOKING_ATTEMPTS_PER_IP_DAY ?? 10),
   maxSlotsShown: 4,
   tz: "America/Chicago",
-  promptVersion: "agent-v10",
+  promptVersion: "agent-v11",
 };
 
 // DEMO_NOW pins the clock exactly (tests and the eval, so runs are repeatable). CLOCK_FLOOR is for the live demo: the

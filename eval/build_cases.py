@@ -47,6 +47,8 @@ REQUIRED = {
     "membership_upgrade": [r"\$80", r"prorat"],
     "warranty_coverage": [r"\b(1|one|2|two|5|five)[- ]year", r"\b(1|2|5) years?\b"],
     "warranty_transfer": [r"(do(es)?n['’]?t|do(es)? not) transfer", r"transfer form", r"\$50", r"once to"],
+    # A wrong number is closed by saying who the caller reached (added after the 2026-10-18 audit; it had no check).
+    "wrong_number": [r"Meridian"],
 }
 # Values from superseded documents. Seeing one in an answer fails the case.
 FORBIDDEN = [r"\$79\b", r"\$12\.99", r"\$219", r"90[- ]day (labor |repair )?warranty", r"48[- ]hours?", r"10% off",
@@ -87,7 +89,7 @@ def expected(intent: str, req: str) -> dict:
     if intent in CHANGE:
         return {"outcome": "changed", "action": CHANGE[intent]}
     if intent in CLOSE:
-        return {"outcome": "answered", "required": []}
+        return {"outcome": "answered", "required": REQUIRED[intent]}
     if intent == "unlabeled":
         return {"outcome": "unknown"}
     return {"outcome": "handoff"}

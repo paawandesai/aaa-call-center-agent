@@ -58,10 +58,17 @@ export function ipBucket(raw: string): string {
   return `${groups.slice(0, 4).map((g) => g.toLowerCase().replace(/^0+(?=.)/, "")).join(":")}::/64`;
 }
 
-// The client address as Railway's edge proxy saw it: the last X-Forwarded-For entry is the one the proxy appended,
-// so a client can't choose it by sending its own header. Returned as its rate-limit bucket (IPv4, or IPv6 /64), which is
-// all it is used for.
-export function clientIp(req: Request): string {
+// The client address as the edge proxy saw it, returned as its rate-limit bucket (IPv4, or IPv6 /64), which is all it is
+// used for. Which header carries it depends on the host, so CLIENT_IP_SOURCE picks it: "x_real_ip" (Railway's edge sets it
+// on every request), "xff_last" (the entry a proxy appends) or "xff_first". Check the choice on the live host with
+// GET /api/staff/ip-check, sending spoofed headers: the right source ignores them.
+export type IpSource = "x_real_ip" | "xff_last" | "xff_first";
+export function ipCandidates(req: Request): Record<IpSource, string | undefined> {
   const parts = (req.headers.get("x-forwarded-for") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
-  return ipBucket(parts.at(-1) ?? "unknown");
+  return { x_real_ip: req.headers.get("x-real-ip")?.trim() || undefined, xff_last: parts.at(-1), xff_first: parts[0] };
+}
+export function clientIp(req: Request): string {
+  const source = (process.env.CLIENT_IP_SOURCE ?? "xff_last") as IpSource;
+  const c = ipCandidates(req);
+  return ipBucket(c[source] ?? c.xff_last ?? "unknown");
 }

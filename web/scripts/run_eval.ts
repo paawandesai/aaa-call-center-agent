@@ -3,7 +3,7 @@
 //   npx tsx scripts/run_eval.ts [--split holdout|dev] [--limit N] [--only holdout|adversarial]  ("holdout" = the case set chosen by --split)
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash, randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { runTurn } from "../lib/agent";
 import { config } from "../lib/config";
@@ -291,6 +291,8 @@ if (only !== "adversarial") {
     contained_any: rate(rows.filter((r) => r.contained).length, n),
     ceiling: rate(handled.length, n),
     accuracy: rate(handled.filter((r) => r.correct).length, handled.length),
+    // Not tied to the ceiling: of the calls the agent kept (answered, booked or changed, in scope or not), how many were right.
+    kept_accuracy: rate(verified, rows.filter((r) => r.contained).length),
     escalation: { precision: rate(esc.filter((r) => r.escalateExpected).length, esc.length), recall: rate(escExp.filter((r) => r.escalated).length, escExp.length) },
     safety: rate(rows.filter((r) => r.expected === "safety" && r.got.startsWith("safety")).length, rows.filter((r) => r.expected === "safety").length),
     // Booking cases expected to hand off because the case's (hashed) ZIP zone has no openings for that service.
@@ -365,6 +367,31 @@ for (const it of R.items) {
 }
 out.retrieval = { hit5: rate(hits, R.items.length), mrr: mrr / R.items.length, where: "app query on pgvector (PGlite), dev set" };
 
+// ---------- retrieval on the real held-out questions (held-out runs only) ----------
+// Each September knowledge-base question (its redacted opening line) goes through the app's query. Gold = a chunk from the
+// current document for that intent that also contains one of the case's required facts, so the passage can answer it.
+if (split === "holdout" && only !== "adversarial") {
+  const GOLD_DOCS: Record<string, string[]> = {
+    membership: ["membership/comfort_club_overview.md", "pricing/2026_fee_schedule.pdf"],
+    warranty: ["warranty/warranty_policy.md"],
+  };
+  const HC = (JSON.parse(readFileSync(path.join(EVAL_DIR, "holdout_cases.json"), "utf8")) as {
+    cases: { id: string; intent: string; opening: string; expected: { outcome: string; required?: string[] } }[] }).cases
+    .filter((k) => k.expected.outcome === "answered" && k.expected.required?.length && GOLD_DOCS[k.intent.split("_")[0]]);
+  let h1 = 0, h5 = 0, rr = 0;
+  const per: { id: string; intent: string; rank: number | null }[] = [];
+  for (const k of HC) {
+    const top = await searchKb(d, k.opening, 5);
+    const docs = GOLD_DOCS[k.intent.split("_")[0]];
+    const rank = top.findIndex((c) => docs.includes(c.doc) && k.expected.required!.some((r) => rx(r).test(c.text)));
+    if (rank === 0) h1++;
+    if (rank >= 0) { h5++; rr += 1 / (rank + 1); }
+    per.push({ id: k.id, intent: k.intent, rank: rank >= 0 ? rank + 1 : null });
+  }
+  out.retrieval_holdout = { hit1: rate(h1, HC.length), hit5: rate(h5, HC.length), mrr: HC.length ? rr / HC.length : 0, cases: per,
+    where: "app query on pgvector (PGlite), September knowledge-base questions (redacted openings, not committed)" };
+}
+
 const runId = new Date().toISOString().replace(/[-:]/g, "").slice(0, 13) + "-" + randomBytes(2).toString("hex");
 // The id also covers the routing rules and the safety classifier, which change behaviour without touching the prompt.
 const codeHash = ["lib/policy.ts", "lib/safety.ts", "lib/agent.ts"].map((f) => readFileSync(path.join(REPO, "web", f), "utf8"));
@@ -378,6 +405,11 @@ const summary = { run_id: runId, created_at: new Date().toISOString(), config_id
 mkdirSync(EVAL_DIR, { recursive: true });
 writeFileSync(path.join(EVAL_DIR, `run_${runId}.json`), JSON.stringify({ summary, cases: caseLog }, null, 1)); // contains model text: kept outside the repo
 if (!Number.isFinite(limit) && !only && split === "holdout") writeFileSync(path.join(REPO, "eval/results/containment_holdout.json"), JSON.stringify(summary, null, 1) + "\n");
+// Every held-out invocation is logged, partial and adversarial-only ones included, so the number of looks is on record.
+if (split === "holdout") appendFileSync(path.join(REPO, "eval/results/holdout_invocations.jsonl"), JSON.stringify({ run_id: runId,
+  created_at: summary.created_at, prompt_version: config.promptVersion, config_id: configId, only: only || "both",
+  limit: Number.isFinite(limit) ? limit : null, contained: (out.holdout as { containment?: { k: number } } | undefined)?.containment?.k ?? null,
+  n: (out.holdout as { n?: number } | undefined)?.n ?? null }) + "\n");
 // Every full dev run is kept (metadata and labels only), so the tuning history is visible.
 if (!Number.isFinite(limit) && split === "dev") {
   mkdirSync(path.join(REPO, "eval/results/dev_runs"), { recursive: true });

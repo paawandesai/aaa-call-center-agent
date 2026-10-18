@@ -18,9 +18,11 @@ export const FEE_LABEL: Record<ServiceType, string> = {
   estimate: "Free in-home estimate",
 };
 // Holiday closures from the 2026 holiday hours notice. No regular appointments on these dates.
-// Full closures from the holiday hours image. Its shortened Christmas Eve hours are not modelled. The mock schedule rolls
-// forward weekly (lib/seed.ts), so these dates can come into range.
+// Full closures from the holiday hours image. The mock schedule rolls forward weekly (lib/seed.ts), so these dates can
+// come into range.
 export const CLOSED_DATES = ["2026-11-26", "2026-11-27", "2026-12-25", "2027-01-01"];
+// Shortened days from the same image: Christmas Eve is 7 am to 12 pm, so only the morning window is offered.
+export const MORNING_ONLY_DATES = ["2026-12-24"];
 const LEAD_MINUTES = 120;
 
 export interface Slot {
@@ -52,6 +54,7 @@ const AVAILABLE = `
   AND s.start_utc > $1
   AND extract(isodow FROM s.slot_date) <> 7  -- closed Sundays (customer FAQ); the mock data has no Sunday slots today
   AND NOT (to_char(s.slot_date, 'YYYY-MM-DD') = ANY($2::text[]))
+  AND NOT (to_char(s.slot_date, 'YYYY-MM-DD') IN (${MORNING_ONLY_DATES.map((d) => `'${d}'`).join(",")}) AND s."window" <> '08:00-12:00')
   AND NOT EXISTS (
     SELECT 1 FROM appointments a JOIN appointment_slots o ON o.slot_id = a.slot_id
     WHERE a.status = 'scheduled' AND o.tech_id = s.tech_id

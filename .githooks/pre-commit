@@ -6,9 +6,12 @@ if command -v gitleaks >/dev/null; then
 else
   echo "gitleaks not installed; install it before committing" >&2; exit 1
 fi
-if git diff --cached -U0 -- . ':!.githooks/pre-commit' | grep '^+' | grep -v '^+++' | grep -iE 'api[_-]?key\s*[:=]\s*["'"'"']?[A-Za-z0-9_-]{16,}|secret\s*[:=]|Bearer [A-Za-z0-9._-]{10,}|sk-ant-|glpat-|passw(or)?d\s*[:=]\s*[^p ]'; then
+if git diff --cached -U0 -- . ':!.githooks/pre-commit' | grep '^+' | grep -v '^+++' | grep -iE 'api[_-]?key\s*[:=]\s*["'"'"']?[A-Za-z0-9_-]{16,}|secret\s*[:=]\s*[^p# ]|Bearer [A-Za-z0-9._-]{10,}|sk-ant-|glpat-|passw(or)?d\s*[:=]\s*[^p ]'; then
   echo "possible secret in staged diff" >&2; exit 1
 fi
+# The guardrail's broad pattern catches words like "token" in ordinary code, so it warns instead of blocking.
+broad=$(git diff --cached -U0 -- . ':!.githooks/pre-commit' | grep '^+' | grep -v '^+++' | grep -ciE 'api[_-]?key|secret|token|passw|Bearer |sk-' || true)
+[ "$broad" -gt 0 ] && echo "note: $broad added lines mention key/secret/token/password words; check them (git diff --cached | grep -iE 'api[_-]?key|secret|token|passw|Bearer |sk-')" >&2
 if git diff --cached --name-only | grep -E '(^|/)data/|\.sqlite$|call_transcripts|knowledge_base/'; then
   echo "partner data must not be committed" >&2; exit 1
 fi

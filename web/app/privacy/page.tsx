@@ -11,6 +11,7 @@ export default function Privacy() {
       <h1 className="h1" style={{ margin: 0 }}>Privacy notice</h1>
       <p style={{ margin: 0 }}><PrivacyText /></p>
       <p className="small muted" style={{ margin: 0 }}>This is a demo with synthetic data. Meridian Home Comfort is a fictional company.</p>
+      <p className="small muted" style={{ margin: 0 }}>Built with the bge-small-en-v1.5 embedding model (BAAI, MIT License) and IBM Plex fonts (SIL Open Font License 1.1). <a href="/notices">Third-party notices</a></p>
       <a href="/chat">Back to the chat</a>
     </main>
   );

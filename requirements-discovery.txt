@@ -12,7 +12,7 @@ confection==0.1.5
 cryptography==50.0.2
 cymem==2.0.13
 en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
-fastembed==0.7.3
+fastembed==0.9.0
 filelock==4.2.0
 flatbuffers==25.12.19
 fsspec==2026.9.0
@@ -31,9 +31,9 @@ murmurhash==1.0.15
 numpy==2.5.4
 onnxruntime==1.31.0
 packaging==26.3
-pdfminer.six==20250506
-pdfplumber==0.11.7
-pillow==11.3.0
+pdfminer.six==20260107
+pdfplumber==0.11.10
+pillow==12.3.0
 preshed==3.0.13
 protobuf==7.36.2
 py_rust_stemmers==0.1.8
