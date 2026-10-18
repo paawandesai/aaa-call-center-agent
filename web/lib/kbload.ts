@@ -25,6 +25,8 @@ export async function loadKb(d: Db, chunksPath: string) {
          config.embedTag, toVector(vecs[i])],
       );
     }
+    // The newest load; the nightly reset never prunes it, so an old instance still running during a deploy can't delete it.
+    await q.query(`INSERT INTO app_meta VALUES ('kb_tag_latest', $1) ON CONFLICT (key) DO UPDATE SET value = excluded.value`, [config.embedTag]);
   });
   return chunks.length;
 }

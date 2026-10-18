@@ -46,6 +46,11 @@ export function ipBucket(raw: string): string {
   const ip = raw.split("%")[0].toLowerCase(); // drop an IPv6 zone id
   const mapped = /^(?:0*:)*:?ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip); // IPv4-mapped IPv6 is the IPv4 address
   if (mapped) return mapped[1];
+  const hexMapped = /^(?:0*:)*:?ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(ip); // the same, written in hex (::ffff:7f00:1)
+  if (hexMapped) {
+    const [hi, lo] = [parseInt(hexMapped[1], 16), parseInt(hexMapped[2], 16)];
+    return `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+  }
   if (!ip.includes(":") || ip === "::1") return ip;
   const [head, tail = ""] = ip.split("::");
   const h = head ? head.split(":") : [];

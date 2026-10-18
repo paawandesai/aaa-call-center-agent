@@ -23,7 +23,8 @@ export async function createHandoff(q: Queryable, c: Conversation, reason: Hando
      RETURNING h.id::int AS id, (SELECT count(*)::int FROM handoffs o WHERE o.status = 'open' AND o.created_at <= h.created_at) AS position`,
     [c.sessionId, reason, text, MAX_SUMMARY]);
   if (open[0]) return open[0];
-  if (reason !== "safety" && c.clientIp && !allow(`handoffip:${c.clientIp}`, PER_IP_DAY, 86_400_000).ok) return { suppressed: true };
+  // Safety and threat tickets are never dropped.
+  if (reason !== "safety" && reason !== "adversarial" && c.clientIp && !allow(`handoffip:${c.clientIp}`, PER_IP_DAY, 86_400_000).ok) return { suppressed: true };
   const slot = c.pending ? { slot_id: c.pending.slot_id, service_type: c.pending.service_type }
     : c.bookedRefs?.length ? { booked_refs: c.bookedRefs } : null;
   const callerProvided: Record<string, string> = {};

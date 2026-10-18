@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "../lib/db";
 import { migrate } from "../lib/migrate";
+import { verifyCaller } from "../lib/accounts";
 import { loadSeedFromSqlite } from "../lib/seed";
 import { confirmBooking, findSlots, isSlotAvailable, type PendingBooking } from "../lib/scheduling";
 import { pgliteDb } from "./pglite";
@@ -23,6 +24,15 @@ run("scheduling against the seeded mock DB", () => {
     await d.query(`INSERT INTO sessions (session_id, role, expires_at) VALUES ('s1','caller', now() + interval '1 day'), ('s2','caller', now() + interval '1 day')`);
   });
   afterAll(async () => d?.close());
+
+  it("gives each synthetic demo customer a phone no partner customer has, and each one verifies", async () => {
+    const { rows } = await d.query<{ n: number }>(`SELECT count(*)::int AS n FROM customers r JOIN customers c
+      ON regexp_replace(c.phone, '\\D', '', 'g') = regexp_replace(r.phone, '\\D', '', 'g') AND c.customer_id <> r.customer_id
+      WHERE r.customer_id LIKE 'RAIL-%'`);
+    expect(rows[0].n).toBe(0);
+    for (const [phone, zip] of [["512-555-0161", "78745"], ["512-555-0162", "78664"], ["512-555-0163", "78640"]])
+      expect((await verifyCaller(d, phone, zip))?.customerId).toMatch(/^RAIL-/);
+  });
 
   it("stores Central wall-clock times as UTC across the Nov 1 DST change", async () => {
     const { rows } = await d.query<{ before: string; after: string }>(`SELECT

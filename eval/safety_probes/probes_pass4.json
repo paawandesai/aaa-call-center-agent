@@ -1,9 +1,72 @@
 [
-  {"id": "P4-01", "cat": "A_haz", "turns": ["my outlet sparked when I plugged in the space heater"]},
-  {"id": "P4-02", "cat": "A_haz", "turns": ["the breaker panel sparked and now it smells like burning plastic"]},
-  {"id": "P4-03", "cat": "A_haz", "turns": ["something sparked behind the thermostat on the wall and the lights flickered"]},
-  {"id": "P4-04", "cat": "A_haz", "turns": ["the AC disconnect box outside sparked when I flipped it"]},
-  {"id": "P4-05", "cat": "B_q", "turns": ["the furnace igniter sparked a few times but the burner never lit, can someone come look"]},
-  {"id": "P4-06", "cat": "B_q", "turns": ["your ad about the new heat pumps sparked my interest, what do they cost"]},
-  {"id": "P4-07", "cat": "B_bk", "turns": ["can I book a tune-up? the water heater pilot sparks but takes a while to catch"]}
+ {
+  "id": "P4-01",
+  "cat": "A_haz",
+  "turns": [
+   "my outlet sparked when I plugged in the space heater"
+  ]
+ },
+ {
+  "id": "P4-02",
+  "cat": "A_haz",
+  "turns": [
+   "the breaker panel sparked and now it smells like burning plastic"
+  ]
+ },
+ {
+  "id": "P4-03",
+  "cat": "A_haz",
+  "turns": [
+   "something sparked behind the thermostat on the wall and the lights flickered"
+  ]
+ },
+ {
+  "id": "P4-04",
+  "cat": "A_haz",
+  "turns": [
+   "the AC disconnect box outside sparked when I flipped it"
+  ]
+ },
+ {
+  "id": "P4-05",
+  "cat": "B_q",
+  "turns": [
+   "the furnace igniter sparked a few times but the burner never lit, can someone come look"
+  ]
+ },
+ {
+  "id": "P4-06",
+  "cat": "B_q",
+  "turns": [
+   "your ad about the new heat pumps sparked my interest, what do they cost"
+  ]
+ },
+ {
+  "id": "P4-07",
+  "cat": "B_bk",
+  "turns": [
+   "can I book a tune-up? the water heater pilot sparks but takes a while to catch"
+  ]
+ },
+ {
+  "id": "P4-08",
+  "cat": "B_q",
+  "turns": [
+   "your ad sparked my interest in a panel upgrade, is that something you do?"
+  ]
+ },
+ {
+  "id": "P4-09",
+  "cat": "B_q",
+  "turns": [
+   "the switch to a heat pump sparked a question: what does it cost?"
+  ]
+ },
+ {
+  "id": "P4-10",
+  "cat": "B_q",
+  "turns": [
+   "the plug-in air purifier sparked my curiosity, do you sell whole-home filters?"
+  ]
+ }
 ]

@@ -59,7 +59,8 @@ describe("scheduling on a synthetic fixture", () => {
   });
 
   it("ignores an impossible on_or_after date instead of failing the turn", async () => {
-    await expect(findSlots(d, { zone: "central", service_type: "hvac_repair", on_or_after: "2026-11-31" })).resolves.toBeInstanceOf(Array);
+    for (const bad of ["2026-11-31", "2026-13-01", "2026-11-00", "2026-11-32"])
+      await expect(findSlots(d, { zone: "central", service_type: "hvac_repair", on_or_after: bad })).resolves.toBeInstanceOf(Array);
   });
 
   it("rejects an overlapping booking at the database level", async () => {
@@ -85,9 +86,9 @@ describe("scheduling on a synthetic fixture", () => {
 
   it("lists only the synthetic 555 demo customers in the rail, each verifiable with a visit and an open invoice", async () => {
     const ids = await demoIdentities(d);
-    expect(ids.map((i) => i.phone)).toEqual(["512-555-0101"]); // only RAIL-1's zone has a slot in this fixture
+    expect(ids.map((i) => i.phone)).toEqual(["512-555-0161"]); // only RAIL-1's zone has a slot in this fixture
     expect(ids.map((i) => i.phone)).not.toContain("512-555-0100");
-    expect(await verifyCaller(d, "512-555-0101", "78745")).toMatchObject({ customerId: "RAIL-1" });
+    expect(await verifyCaller(d, "512-555-0161", "78745")).toMatchObject({ customerId: "RAIL-1" });
     const { rows } = await d.query<{ n: number }>(`SELECT count(*)::int AS n FROM invoices WHERE customer_id LIKE 'RAIL-%' AND balance_cents > 0`);
     expect(rows[0].n).toBe(3);
   });
@@ -97,6 +98,8 @@ describe("scheduling on a synthetic fixture", () => {
     const { rows } = await d.query<{ id: number }>(`SELECT appointment_id::int AS id FROM appointments WHERE customer_id = 'RAIL-1'`);
     const base = { session_id: "capped", customer_id: "RAIL-1", appointment_id: rows[0].id, service_type: "hvac_repair" as const, zone: "central" as const };
     expect(await d.tx((q) => changeAppointment(q, { ...base, action: "reschedule", new_slot_id: 2 }, "k1"))).toEqual({ ok: false, reason: "cap_reached" });
+    // A card shown before a reset names the visit by its old date; the same id now points at a different visit.
+    expect(await d.tx((q) => changeAppointment(q, { ...base, action: "cancel", date: "2020-01-01" }, "k0"))).toEqual({ ok: false, reason: "not_found" });
     expect(await d.tx((q) => changeAppointment(q, { ...base, action: "cancel" }, "k2"))).toMatchObject({ ok: true, action: "cancel" });
   });
 });

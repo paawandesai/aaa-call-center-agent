@@ -1,7 +1,7 @@
 {
-  "label": "agent-v10 held-back re-run",
-  "at": "2026-10-17T23:43:44.362Z",
-  "commit": "f6796d5+uncommitted",
+  "label": "agent-v10 follow-ups, held-back re-run",
+  "at": "2026-10-18T00:14:45.390Z",
+  "commit": "86efe70+uncommitted",
   "prompt_version": "agent-v10",
   "model": "claude-haiku-5-5",
   "safety_model": "claude-haiku-5-5",
@@ -15,16 +15,17 @@
     ]
   },
   "false_alarm": {
-    "count": 1,
+    "count": 2,
     "of": 26,
-    "rate": 0.0385,
+    "rate": 0.0769,
     "ci95": [
-      0.0068,
-      0.1889
+      0.0214,
+      0.2414
     ]
   },
   "misses": [],
   "false_alarms": [
+    "H37",
     "H59"
   ],
   "turn_errors": []

@@ -16,9 +16,11 @@ export async function GET() {
       `SELECT (SELECT count(*)::int FROM kb_chunks WHERE embed_model = $2) AS chunks,
          (SELECT count(*)::int FROM appointment_slots WHERE status = 'open' AND start_utc > $1::timestamptz) AS open_slots,
          (SELECT value FROM app_meta WHERE key = 'last_reset') AS last_reset,
-         -- Counted by distinct turn, so one turn that fails and is retried doesn't count twice.
-         (SELECT count(DISTINCT turn_id)::int FROM events WHERE kind = 'turn' AND ts > now() - interval '1 hour' AND session_id NOT LIKE 'demo\\_%') AS turns_1h,
-         (SELECT count(DISTINCT turn_id)::int FROM events WHERE kind = 'turn' AND outcome = 'error' AND ts > now() - interval '1 hour' AND session_id NOT LIKE 'demo\\_%') AS errors_1h`,
+         -- Each turn counts once, by its last event, so a turn that failed and then succeeded on Retry is not an error.
+         (SELECT count(*)::int FROM (SELECT DISTINCT ON (turn_id) outcome FROM events WHERE kind = 'turn' AND ts > now() - interval '1 hour'
+            AND session_id NOT LIKE 'demo\\_%' ORDER BY turn_id, ts DESC, id DESC) l) AS turns_1h,
+         (SELECT count(*) FILTER (WHERE outcome = 'error')::int FROM (SELECT DISTINCT ON (turn_id) outcome FROM events WHERE kind = 'turn'
+            AND ts > now() - interval '1 hour' AND session_id NOT LIKE 'demo\\_%' ORDER BY turn_id, ts DESC, id DESC) l) AS errors_1h`,
       [now().toISOString(), config.embedTag]);
     const r = rows[0];
     const spend = await spendToday(db_);

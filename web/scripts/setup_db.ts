@@ -7,7 +7,7 @@ import { pgDb } from "../lib/db";
 import { seedDemoActivity } from "../lib/demoseed";
 import { loadKb } from "../lib/kbload";
 import { migrate } from "../lib/migrate";
-import { loadSeedFromSqlite, resetLiveTables, seedRailCustomers } from "../lib/seed";
+import { loadSeedFromSqlite, refreshRailCustomers, resetLiveTables } from "../lib/seed";
 
 const d = pgDb(process.env.DATABASE_URL!);
 await migrate(d);
@@ -21,11 +21,10 @@ if (rows[0].n === 0 || process.env.SEED_FORCE === "1") {
 } else if (process.env.RESET_ON_DEPLOY === "1") {
   await resetLiveTables(d);
 }
-// The chat rail's synthetic demo customers come with each reset; add them now if this database predates them.
-if ((await d.query<{ n: number }>(`SELECT count(*)::int AS n FROM customers WHERE customer_id LIKE 'RAIL-%'`)).rows[0].n === 0) {
-  await d.tx((q) => seedRailCustomers(q));
-  console.log("added the synthetic demo customers");
-}
+// The chat rail's synthetic demo customers come with each reset; refresh them now so a deploy that changes them
+// doesn't wait for the nightly reset.
+await d.tx((q) => refreshRailCustomers(q));
+console.log("refreshed the synthetic demo customers");
 const kb = await d.query<{ n: number }>(`SELECT count(*)::int AS n FROM kb_chunks WHERE embed_model = $1`, [config.embedTag]);
 const chunks = path.join(seedDir, "chunks.json");
 if ((kb.rows[0].n === 0 || process.env.KB_FORCE === "1") && existsSync(chunks)) console.log("kb chunks loaded:", await loadKb(d, chunks));

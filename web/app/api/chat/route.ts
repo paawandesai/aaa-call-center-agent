@@ -92,7 +92,7 @@ export async function POST(req: Request) {
               if (r.outcome !== "error") conv.turns.set(b.turn_id, conv.messages.length);
               void record({ session_id: session.id, turn_id: b.turn_id, kind: "turn", intent: r.intent, outcome: r.outcome,
                 reason: r.handoffReason, latency_ms: Date.now() - started, first_token_ms: r.firstTokenMs, input_tokens: r.inputTokens,
-                output_tokens: r.outputTokens, top_score: r.topScore, meta: { tools: r.toolCalls.join(","), action: b.action ?? null, conversation: b.conversation_id } });
+                output_tokens: r.outputTokens, top_score: r.topScore, meta: { tools: r.toolCalls.join(","), action: b.action ?? null, conversation: b.conversation_id, ...(r.handoffSuppressed ? { handoff_suppressed: true } : {}) } });
             }
           } finally {
             busy.delete(lockKey);

@@ -68,6 +68,10 @@ export interface PendingChange {
   new_slot_id?: number;
   service_type: ServiceType;
   zone: Zone;
+  // The dates on the card when it was shown. The nightly reset re-creates appointments and rolls slots forward, so an id
+  // can name a different visit or day by the time Confirm is pressed.
+  date?: string;
+  new_date?: string;
 }
 
 // Cancellations or moves inside 24 hours of the window carry the $49 late fee (customer FAQ and 2026 fee schedule).
@@ -91,7 +95,7 @@ export async function changeAppointment(tx: Queryable, p: PendingChange, idempot
      FROM appointments a JOIN appointment_slots s ON s.slot_id = a.slot_id
      WHERE a.appointment_id = $1 AND a.customer_id = $2 FOR UPDATE OF a`, [p.appointment_id, p.customer_id]);
   const o = old.rows[0];
-  if (!o) return { ok: false, reason: "not_found" };
+  if (!o || (p.date && o.date !== p.date)) return { ok: false, reason: "not_found" };
   const service = SERVICE_LABEL[p.service_type];
   if (prior.rows[0]) {
     const r = prior.rows[0];
@@ -114,7 +118,7 @@ export async function changeAppointment(tx: Queryable, p: PendingChange, idempot
     if (!slotRow.rows[0]) return { ok: false, reason: "slot_taken" };
     await tx.query(`SELECT 1 FROM technicians WHERE tech_id = $1 FOR UPDATE`, [slotRow.rows[0].tech_id]);
     const slot = await isSlotAvailable(tx, p.new_slot_id!, p.zone, p.service_type);
-    if (!slot) return { ok: false, reason: "slot_taken" };
+    if (!slot || (p.new_date && slot.date !== p.new_date)) return { ok: false, reason: "slot_taken" };
     ref = `MHC-R${p.appointment_id}-${slot.slot_id}`;
     when = whenLabel(slot.date, slot.window);
     await tx.query(`UPDATE appointments SET status = 'cancelled' WHERE appointment_id = $1`, [p.appointment_id]);

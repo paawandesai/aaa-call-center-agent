@@ -26,8 +26,10 @@ export async function maybeNightlyReset(d: Db = db()): Promise<boolean> {
     const { rows: again } = await q.query<{ due: boolean }>(`SELECT ${DUE} AS due`);
     if (!again[0]?.due) return false;
     await resetLiveTablesIn(q);
-    // Vectors from an earlier embedding model or revision, kept through the deploy that replaced them.
-    await q.query(`DELETE FROM kb_chunks WHERE embed_model <> $1`, [config.embedTag]);
+    // Vectors from an earlier embedding model or revision, kept through the deploy that replaced them. The newest load is
+    // kept too, in case this is the old instance still running while a deploy with a new model takes over.
+    await q.query(`DELETE FROM kb_chunks WHERE embed_model <> $1
+      AND embed_model <> coalesce((SELECT value FROM app_meta WHERE key = 'kb_tag_latest'), $1)`, [config.embedTag]);
     await q.query(`DELETE FROM handoffs WHERE created_at < now() - interval '7 days'`);
     await q.query(`DELETE FROM feedback WHERE created_at < now() - interval '30 days'`);
     await q.query(`DELETE FROM staff_flags WHERE created_at < now() - interval '30 days'`);

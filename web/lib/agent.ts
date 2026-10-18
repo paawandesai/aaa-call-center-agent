@@ -131,7 +131,11 @@ export interface TurnResult {
   toolCalls: string[];
   safetyCheck?: string; // the classifier's result: clear, failed, or the hazard category it locked on
   safetyUsage?: Usage; // the classifier's tokens, priced at SAFETY_MODEL
+  handoffSuppressed?: boolean; // a non-safety ticket was over the per-IP demo cap, so nothing was queued
 }
+
+// Said instead of the handoff line when the per-IP demo cap stopped the ticket, so the caller isn't told a person is coming.
+const NOT_QUEUED_COPY = "This demo has reached today's limit for passing requests to our team from your connection, so this one wasn't sent and nobody will follow up from here. Please contact the office directly for this.";
 
 // What the caller sees under "What I've passed on" for policy-routed handoffs.
 const INTENT_SUMMARY: Record<string, string> = {
@@ -171,14 +175,16 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
   const res: TurnResult = { outcome: "answered", inputTokens: 0, outputTokens: 0, usage: emptyUsage(), toolCalls: [] };
   const text = callerText.slice(0, 2000);
 
-  const scripted = async (reply: string, reason: HandoffReason | null, intent: string) => {
+  // pre: the ticket was already created by the caller of scripted (so the reply could depend on whether it was queued).
+  const scripted = async (reply: string, reason: HandoffReason | null, intent: string, pre?: { h: HandoffResult | undefined }) => {
     c.intents.push(intent);
     // Keep the transcript coherent for later turns; the scripted reply is ours, not the model's.
     c.messages.push({ role: "user", content: turnData(today(), [], text) });
     c.messages.push({ role: "assistant", content: reply });
     if (reason) {
       // One handoff per reason per conversation: repeating the request doesn't add another ticket to the queue.
-      const h = c.handoff === reason ? undefined : await createHandoff(deps.db, c, reason, `Sent by a fixed rule, not written by AI: ${intent.replace(/_/g, " ")}.`, text, "policy");
+      const h = pre ? pre.h : c.handoff === reason ? undefined : await createHandoff(deps.db, c, reason, `Sent by a fixed rule, not written by AI: ${intent.replace(/_/g, " ")}.`, text, "policy");
+      if (h && "suppressed" in h) res.handoffSuppressed = true;
       c.handoff = reason;
       emit({ type: "handoff", reason_enum: reason, summary_for_caller: INTENT_SUMMARY[intent] ?? HANDOFF_COPY[reason], ...queueFields(h) });
     }
@@ -218,8 +224,12 @@ export async function runTurn(deps: Deps, c: Conversation, callerText: string, e
     return { ...res, outcome: "safety", handoffReason: reason, intent: r.intent };
   }
   if (r.kind === "handoff") {
-    emit({ type: "text_delta", text: HANDOFF_COPY[r.reason] });
-    await scripted(HANDOFF_COPY[r.reason], r.reason, r.intent);
+    c.intents.push(r.intent); // createHandoff reads the latest intent; scripted pushes it again for the transcript
+    const h = c.handoff === r.reason ? undefined : await createHandoff(deps.db, c, r.reason, `Sent by a fixed rule, not written by AI: ${r.intent.replace(/_/g, " ")}.`, text, "policy");
+    c.intents.pop();
+    const copy = h && "suppressed" in h ? NOT_QUEUED_COPY : HANDOFF_COPY[r.reason];
+    emit({ type: "text_delta", text: copy });
+    await scripted(copy, r.reason, r.intent, { h });
     return { ...res, outcome: "handoff", handoffReason: r.reason, intent: r.intent };
   }
   // After the 988 script the model never takes the conversation back: every later message gets the same short, fixed reply.
@@ -431,6 +441,7 @@ async function modelHandoff(deps: Deps, c: Conversation, asked: (typeof MODEL_HA
     emit({ type: "safety", script, text: SCRIPTS[script] });
   }
   const h = c.handoff === reason ? undefined : await createHandoff(deps.db, c, reason, summary, text);
+  if (h && "suppressed" in h) res.handoffSuppressed = true;
   c.handoff = reason;
   res.outcome = reason === "safety" ? "safety" : "handoff";
   res.handoffReason = reason;
@@ -537,7 +548,8 @@ async function runTool(
       }
       c.pendingChange = { session_id: c.sessionId, customer_id: c.verified.customerId, appointment_id: appt.appointment_id, action: p.data.action,
         new_slot_id: p.data.action === "reschedule" ? p.data.new_slot_id : undefined, service_type: appt.service_type,
-        zone: p.data.action === "reschedule" ? c.offered.get(p.data.new_slot_id)!.zone : appt.zone };
+        zone: p.data.action === "reschedule" ? c.offered.get(p.data.new_slot_id)!.zone : appt.zone,
+        date: appt.date, new_date: p.data.action === "reschedule" ? c.offered.get(p.data.new_slot_id)!.date : undefined };
       const fee = lateFee(appt.start_utc);
       emit({ type: "change_request", action: p.data.action, appointment_id: appt.appointment_id, service: SERVICE_LABEL[appt.service_type],
         current_when: whenLabel(appt.date, appt.window), new_when: newWhen, new_slot_id: p.data.action === "reschedule" ? p.data.new_slot_id : undefined,
@@ -549,6 +561,7 @@ async function runTool(
       const p = HandoffIn.safeParse(u.input);
       if (!p.success) return bad("INVALID_INPUT");
       await modelHandoff(deps, c, p.data.reason, p.data.summary, text, emit, res);
+      if (res.handoffSuppressed) return { content: JSON.stringify({ result: "not_queued", note: "The demo's daily limit stopped this request, so no person will see it. Tell the caller that in one short sentence and suggest they contact the office directly. Do not say a person will follow up." }), card: true };
       return { content: JSON.stringify({ result: "handed_off", note: "Tell the caller in one short sentence that a person will follow up." }), card: true };
     }
     default:

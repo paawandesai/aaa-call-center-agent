@@ -97,10 +97,21 @@ export async function resetLiveTablesIn(q: Queryable) {
 // never shows a partner customer. Each reset gives them an upcoming visit on a free slot and an open invoice.
 // customer_id starts with RAIL- so demoIdentities can pick them and the eval can leave them out.
 const RAIL: { id: string; name: string; phone: string; address: string; city: string; zip: string; zone: Zone; service: ServiceType; issue: string }[] = [
-  { id: "RAIL-1", name: "Dana Example", phone: "512-555-0101", address: "100 Sample St", city: "Austin", zip: "78745", zone: "central", service: "hvac_repair", issue: "AC blowing warm air" },
-  { id: "RAIL-2", name: "Morgan Example", phone: "512-555-0102", address: "200 Sample Ave", city: "Round Rock", zip: "78664", zone: "north", service: "hvac_tune_up", issue: "Fall furnace tune-up" },
-  { id: "RAIL-3", name: "Riley Example", phone: "512-555-0103", address: "300 Sample Ln", city: "Kyle", zip: "78640", zone: "south", service: "plumbing", issue: "Water heater leaking" },
+  { id: "RAIL-1", name: "Dana Example", phone: "512-555-0161", address: "100 Sample St", city: "Austin", zip: "78745", zone: "central", service: "hvac_repair", issue: "AC blowing warm air" },
+  { id: "RAIL-2", name: "Morgan Example", phone: "512-555-0162", address: "200 Sample Ave", city: "Round Rock", zip: "78664", zone: "north", service: "hvac_tune_up", issue: "Fall furnace tune-up" },
+  { id: "RAIL-3", name: "Riley Example", phone: "512-555-0163", address: "300 Sample Ln", city: "Kyle", zip: "78640", zone: "south", service: "plumbing", issue: "Water heater leaking" },
 ];
+// Deploy-time version for a database whose last reset predates the current RAIL list: drop the old rows (freeing their
+// slots) and add them again.
+export async function refreshRailCustomers(q: Queryable) {
+  await q.query(`DELETE FROM invoices WHERE customer_id LIKE 'RAIL-%'`);
+  const { rows } = await q.query<{ slot_id: number }>(`DELETE FROM appointments WHERE customer_id LIKE 'RAIL-%' RETURNING slot_id`);
+  await q.query(`UPDATE appointment_slots s SET status = 'open' WHERE s.slot_id = ANY($1::int[]) AND s.status = 'booked'
+    AND NOT EXISTS (SELECT 1 FROM appointments a WHERE a.slot_id = s.slot_id AND a.status = 'scheduled')`, [rows.map((r) => r.slot_id)]);
+  await q.query(`DELETE FROM customers WHERE customer_id LIKE 'RAIL-%'`);
+  await seedRailCustomers(q);
+}
+
 export async function seedRailCustomers(q: Queryable) {
   const t = now();
   const cdate = (days: number) => new Date(t.getTime() + days * 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });

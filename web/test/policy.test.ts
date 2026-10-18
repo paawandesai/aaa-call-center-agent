@@ -157,6 +157,8 @@ describe("sparked (fourth-pass review)", () => {
   it.each(["my outlet sparked when I plugged in the heater", "the breaker panel sparked and now half the house is dark", "it sparked behind the wall switch"])(
     "electrical: %s", (text) => expect(route(text)).toMatchObject({ kind: "safety", script: "electrical" }));
   it("a bare 'sparked' is an ambiguous word for the classifier", () => expect(route("the fan motor sparked once")).toMatchObject({ kind: "safety", tier: "weak" }));
+  it.each(["your ad sparked my interest in a panel upgrade", "the switch to a heat pump sparked a question: what does it cost?", "the plug-in air purifier sparked my curiosity"])(
+    "does not lock on the idiom %s", (text) => expect(locksNow(text)).toBe(false));
 });
 
 describe("igniter sparks (fourth-pass review)", () => {

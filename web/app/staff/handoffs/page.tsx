@@ -26,9 +26,12 @@ export default async function Handoffs({ searchParams }: { searchParams: Promise
   const waiting = await openHandoffCount(q);
   const want = Number((await searchParams).id);
   const sel = rows.find((h) => h.id === want) ?? rows[0];
-  // Model summaries are stored with an "AI-written: " prefix; rule-based handoffs carry fixed text without it.
-  const aiWritten = !!sel?.summary.startsWith("AI-written: ");
-  const [summary, excerpt] = sel ? sel.summary.replace(/^AI-written: /, "").split("\nCaller's last message (redacted): ") : ["", ""];
+  // Model summaries are stored with an "AI-written: " prefix; rule-based handoffs carry fixed text without it. A repeat handoff in
+  // the same session is appended as another entry (lib/handoffs.ts), each with its own summary and excerpt.
+  const entries = (sel?.summary ?? "").split("\n---\nLater, in the same session:\n").filter(Boolean).map((e) => {
+    const [summary, excerpt = ""] = e.replace(/^AI-written: /, "").split("\nCaller's last message (redacted): ");
+    return { ai: e.startsWith("AI-written: "), summary, excerpt };
+  });
   const caller = sel ? Object.fromEntries(Object.entries(sel.caller_provided).filter(([k]) => k !== "verified")) : {};
   return (
     <>
@@ -79,10 +82,12 @@ export default async function Handoffs({ searchParams }: { searchParams: Promise
                 </section>
               ) : null}
 
-              <section className="stack-8">
-                <span className="label">{aiWritten ? "Summary · AI-written, check with the caller" : "Summary · fixed text from a safety or routing rule"}</span>
-                <p style={{ margin: 0, maxWidth: 680 }}>{summary}</p>
-              </section>
+              {entries.map((e, i) => (
+                <section key={i} className="stack-8">
+                  <span className="label">{i > 0 ? "Later in the same chat · " : ""}{e.ai ? "Summary · AI-written, check with the caller" : "Summary · fixed text from a safety or routing rule"}</span>
+                  <p style={{ margin: 0, maxWidth: 680 }}>{e.summary}</p>
+                </section>
+              ))}
 
               <section className="stack-8">
                 <span className="label">What the assistant did</span>
@@ -94,8 +99,9 @@ export default async function Handoffs({ searchParams }: { searchParams: Promise
               </section>
 
               <details style={{ border: "1px solid var(--line)", borderRadius: "var(--r-md)", padding: "12px 16px" }}>
-                <summary style={{ cursor: "pointer", fontWeight: 500, minHeight: 28 }}>Caller&apos;s last message (personal details masked)</summary>
-                <p style={{ margin: "12px 0 0", fontSize: 14, lineHeight: "20px" }}>{excerpt || "Not captured."}</p>
+                <summary style={{ cursor: "pointer", fontWeight: 500, minHeight: 28 }}>Caller&apos;s last message{entries.length > 1 ? "s" : ""} (personal details masked)</summary>
+                {entries.map((e, i) => <p key={i} style={{ margin: "12px 0 0", fontSize: 14, lineHeight: "20px" }}>{e.excerpt || "Not captured."}</p>)}
+                {entries.length === 0 && <p style={{ margin: "12px 0 0", fontSize: 14, lineHeight: "20px" }}>Not captured.</p>}
                 <p className="small muted" style={{ margin: "8px 0 0" }}>Full transcripts are not stored. This excerpt is cut to 300 characters and purged after 7 days.</p>
               </details>
 

@@ -10,6 +10,8 @@ import { pgliteDb } from "./pglite";
 describe("rate-limit buckets", () => {
   it("keys IPv4 by address and IPv6 by /64", () => {
     expect(ipBucket("203.0.113.7")).toBe("203.0.113.7");
+    expect(ipBucket("::ffff:7f00:1")).toBe("127.0.0.1");
+    expect(ipBucket("::ffff:cb00:7107")).toBe("203.0.113.7");
     expect(ipBucket("2001:db8:aa:1::5")).toBe("2001:db8:aa:1::/64");
     expect(ipBucket("2001:0db8:00aa:0001:ffff::9")).toBe("2001:db8:aa:1::/64");
     expect(ipBucket("2001:db8::1")).toBe("2001:db8:0:0::/64");
@@ -47,7 +49,10 @@ describe("handoff tickets", () => {
     const c = getConversation("s-ip-safety", "conv-ip-safety-xxxxxxxx");
     c.clientIp = "198.51.100.9";
     expect("id" in (await createHandoff(d, c, "safety", "x", "I smell gas", "policy"))).toBe(true);
-    expect(await count()).toBe(1 + 5 + 1);
+    const t = getConversation("s-ip-threat", "conv-ip-threat-xxxxxxxx");
+    t.clientIp = "198.51.100.9";
+    expect("id" in (await createHandoff(d, t, "adversarial", "x", "threat", "policy"))).toBe(true);
+    expect(await count()).toBe(1 + 5 + 2);
   });
 });
 

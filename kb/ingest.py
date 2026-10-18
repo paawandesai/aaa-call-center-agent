@@ -117,7 +117,7 @@ def parse_png(p: Path) -> tuple[list[tuple[str, str]], dict]:
 
 
 # Phone extensions and named staff contacts are internal and must not reach callers.
-STAFF_CONTACT = re.compile(r"(?i:\b(ext\.?|extension|x)\s*\d{2,5}\b)|\b(?i:ask for|contact|reach|email|call)\s+[A-Z][a-z]+\s+[A-Z][a-z]+\b")
+STAFF_CONTACT = re.compile(r"(?i:\b(ext\.?|extension)\s*\d{2,5}\b|\bx\d{2,5}\b)|\b(?i:ask for|contact|reach|email|call)\s+[A-Z][a-z]+\s+[A-Z][a-z]+\b")
 INSTRUCTION_LIKE = re.compile(r"(?i)\b(ignore (all|previous)|you are now|as an ai|system prompt|ai:|assistant:|always offer|disregard|note to (the )?(ai|assistant|model|bot))")
 
 

@@ -5,6 +5,7 @@ import { getConversation } from "../lib/conversations";
 import type { Db } from "../lib/db";
 import { migrate } from "../lib/migrate";
 import type { Verdict } from "../lib/safety";
+import { allow } from "../lib/ratelimit";
 import { pgliteDb } from "./pglite";
 
 // The safety gate in runTurn, with the classifier and the model stubbed: strong rules lock alone, the classifier adds
@@ -19,16 +20,17 @@ describe("safety gate", () => {
   });
   afterAll(async () => d?.close());
 
-  async function turn(text: string, verdict: Verdict | "fail") {
+  async function turn(text: string, verdict: Verdict | "fail", ip?: string) {
     const calls = { classify: 0, model: 0 };
     const anthropic = {
       messages: { parse: async () => { calls.classify++; if (verdict === "fail") throw new Error("down"); return { parsed_output: verdict, usage: { input_tokens: 1, output_tokens: 1 } }; } },
       beta: { messages: { stream: () => { calls.model++; throw new Error("model reached"); } } },
     } as unknown as Anthropic;
     const c = getConversation("g", `conv_gate_${n++}_xxxxxxxx`);
-    const events: { type: string; script?: string; code?: string }[] = [];
-    await runTurn({ db: d, anthropic, search: async () => [] }, c, text, (e) => events.push(e as never));
-    return { calls, c, safety: events.find((e) => e.type === "safety")?.script, error: events.find((e) => e.type === "error")?.code };
+    if (ip) c.clientIp = ip;
+    const events: { type: string; script?: string; code?: string; text?: string; not_queued?: boolean }[] = [];
+    const r = await runTurn({ db: d, anthropic, search: async () => [] }, c, text, (e) => events.push(e as never));
+    return { calls, c, r, events, safety: events.find((e) => e.type === "safety")?.script, error: events.find((e) => e.type === "error")?.code };
   }
   const none: Verdict = { category: "none", figurative_or_name: false };
   const idiom: Verdict = { category: "self_harm", figurative_or_name: true };
@@ -71,5 +73,15 @@ describe("safety gate", () => {
   it("skips the check on a bare ZIP", async () => {
     const r = await turn("78745", "fail");
     expect(r.calls.classify).toBe(0);
+  });
+  it("doesn't promise a person when the per-IP cap stopped the ticket", async () => {
+    await d.query(`UPDATE handoffs SET status = 'resolved'`); // otherwise this session's earlier billing ticket gets appended to
+    for (let i = 0; i < 5; i++) allow("handoffip:203.0.113.7", 5, 86_400_000);
+    const t = await turn("I want a refund on my last bill", none, "203.0.113.7");
+    const said = t.events.filter((e) => e.type === "text_delta").map((e) => e.text).join("");
+    expect(said).toMatch(/wasn't sent/);
+    expect(said).not.toMatch(/connect(ing)? you|passing this/i);
+    expect(t.events.find((e) => e.type === "handoff")?.not_queued).toBe(true);
+    expect(t.r.handoffSuppressed).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 {
-  "label": "agent-v10 earlier probes + pass4",
-  "at": "2026-10-17T23:43:43.756Z",
-  "commit": "f6796d5+uncommitted",
+  "label": "agent-v10 follow-ups, earlier probes + pass4",
+  "at": "2026-10-18T00:14:44.771Z",
+  "commit": "86efe70+uncommitted",
   "prompt_version": "agent-v10",
   "model": "claude-haiku-5-5",
   "safety_model": "claude-haiku-5-5",
@@ -16,11 +16,11 @@
   },
   "false_alarm": {
     "count": 0,
-    "of": 105,
+    "of": 108,
     "rate": 0,
     "ci95": [
       0,
-      0.0353
+      0.0343
     ]
   },
   "misses": [],

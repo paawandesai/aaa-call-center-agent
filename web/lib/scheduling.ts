@@ -65,7 +65,10 @@ const SLOT_COLS = `s.slot_id, to_char(s.slot_date, 'YYYY-MM-DD') AS date, s."win
   s.start_utc::text AS start_utc, s.end_utc::text AS end_utc, s.tech_id`;
 
 // YYYY-MM-DD that names a real day ("2026-11-31" would make the ::date cast throw).
-const isRealDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(`${s}T00:00:00Z`).toISOString().startsWith(s);
+const isRealDate = (s: string) => {
+  const t = /^\d{4}-\d{2}-\d{2}$/.test(s) ? Date.parse(`${s}T00:00:00Z`) : NaN;
+  return !Number.isNaN(t) && new Date(t).toISOString().startsWith(s);
+};
 
 export async function findSlots(
   q: Queryable,
