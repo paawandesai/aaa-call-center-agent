@@ -191,6 +191,29 @@ If `/api/health` reports `database: false`, the server log has the reason (for e
 
 Deploy: Railway, Next.js plus Postgres with pgvector, one replica of the `meridian-web` service. Railway does not read `web/railway.json` for this service; the pre-deploy command (`npm run db:setup`: migrations, seed, KB embeddings) and the `/api/health/live` deploy check and ALWAYS restart policy are set on the service itself, and `railway.json` records the same settings. Copy the seed DB and KB chunks into `web/.seed/` as `meridian_scheduling.sqlite` and `chunks.json` (gitignored), set `SESSION_SECRET`, `INVITE_CODE`, `STAFF_CODE`, `ANTHROPIC_AEA_API_KEY`, `CLOCK_FLOOR` and `CLIENT_IP_SOURCE` on the service (per-IP limits read the header it names; sign in with the staff code and open `/api/staff/ip-check` with a made-up `X-Forwarded-For` and `X-Real-IP` to confirm the chosen header ignores them; on 2026-10-18 the live service used `x_real_ip`: `X-Real-IP` carried the connecting address and neither made-up header got through, while the last `X-Forwarded-For` entry was the same address on every test request (probably a proxy or edge hop), so the earlier default `xff_last` likely put every caller in one bucket; this was checked from one network only), and run `railway up -s meridian-web --no-gitignore` from `web/`. The app reaches Postgres only over Railway's private network (`pgvector.railway.internal`); the database service has no public domain or TCP proxy (removed 2026-10-18, owner's decision), and both services restart on any exit. A timer started at server boot (`web/instrumentation.ts`) runs the nightly reset and the 7- and 30-day purges at 03:00 Central even with no traffic. Better Stack Uptime polls `/api/health` and emails the owner on failure; a deployment elsewhere needs its own monitor pointed at it.
 
+### Temporary deploy on Fly.io (October 2026 stopgap)
+
+On 2026-10-21 Railway disclosed that customers' environment variables may have been read, and it paused all deploys. The keys were rotated, but the Railway service can't load the new Anthropic key until it redeploys, so chat there fails. This mirror runs the same code on Fly.io until Railway can redeploy. It differs from the Railway deploy in four ways:
+
+- **No Postgres.** The app runs on its in-process database (`DATABASE_URL=pglite:memory`), seeded from files in the image every time it starts. A restart or redeploy wipes bookings, handoffs, sessions and monitoring events. That's fine for a short demo, but it is not the design described above. It runs on one machine only (`--ha=false`), because a second machine would have separate data.
+- **The seed DB and KB chunks are inside the image.** The image sits in the Fly organization's private registry and is never pushed anywhere public. The files come from `web/.seed/`, which is gitignored.
+- **Per-IP limits read `Fly-Client-IP`** (`CLIENT_IP_SOURCE=fly_client_ip`). After the first deploy, check this with `/api/staff/ip-check` using made-up headers, as described above.
+- **No hosting spend cap.** Fly has no spending cap by default. Model spend is still capped by `DAILY_SPEND_CAP_USD`. The machine is one `shared-cpu-1x` with 2 GB and never sleeps (`auto_stop_machines = "off"`), roughly $11 a month, billed per second. 1 GB is not enough: in a local Docker test on 2026-10-22, the server sat at about 1.1 GB after startup, and a 1 GB limit killed it.
+
+```bash
+cd web
+mkdir -p .seed/scheduling_db
+cp "$MERIDIAN_DATA_DIR/scheduling_db/meridian_scheduling.sqlite" .seed/scheduling_db/
+cp "$KB_CHUNKS" .seed/chunks.json
+fly apps create <name>                     # then put <name> in fly.toml
+read -rs KEY                               # paste the Anthropic key; it isn't echoed or kept in shell history
+fly secrets set --stage ANTHROPIC_AEA_API_KEY="$KEY" INVITE_CODE=<invite code> STAFF_CODE=<staff code>
+fly secrets set --stage SESSION_SECRET=paste-the-output-of-openssl-rand-hex-32
+fly deploy --ha=false
+```
+
+The app is then at `https://<name>.fly.dev`. Point a second Better Stack monitor at `/api/health` there. Once Railway deploys work again, redeploy `meridian-web`, then remove the Fly app with `fly apps destroy <name>`.
+
 ## Known constraints
 
 These are places where the project's guardrails override the brief, or where the demo is limited.

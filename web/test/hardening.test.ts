@@ -75,7 +75,7 @@ describe("pricing fallback", () => {
 
 describe("client address source (final audit, 2026-10-18)", () => {
   const req = (h: Record<string, string>) => new Request("http://x/", { headers: h });
-  const h = { "x-forwarded-for": "203.0.113.7, 198.51.100.9", "x-real-ip": "192.0.2.44" };
+  const h = { "x-forwarded-for": "203.0.113.7, 198.51.100.9", "x-real-ip": "192.0.2.44", "fly-client-ip": "192.0.2.55" };
   afterEach(() => { delete process.env.CLIENT_IP_SOURCE; });
   it("uses the configured header", () => {
     expect(clientIp(req(h))).toBe("198.51.100.9");
@@ -83,6 +83,8 @@ describe("client address source (final audit, 2026-10-18)", () => {
     expect(clientIp(req(h))).toBe("192.0.2.44");
     process.env.CLIENT_IP_SOURCE = "xff_first";
     expect(clientIp(req(h))).toBe("203.0.113.7");
+    process.env.CLIENT_IP_SOURCE = "fly_client_ip";
+    expect(clientIp(req(h))).toBe("192.0.2.55");
   });
   it("falls back to the last forwarded entry when the chosen header is missing", () => {
     process.env.CLIENT_IP_SOURCE = "x_real_ip";

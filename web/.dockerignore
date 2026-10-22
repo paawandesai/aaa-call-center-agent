@@ -1,0 +1,11 @@
+# .seed/ is deliberately NOT ignored: the image needs the seed DB and KB chunks.
+node_modules
+.next
+.models
+.env
+.env.*
+coverage
+test-results
+playwright-report
+*.log
+*.tsbuildinfo
