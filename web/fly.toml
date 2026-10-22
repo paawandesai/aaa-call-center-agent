@@ -1,6 +1,6 @@
 # Temporary Fly.io deploy while Railway deploys are paused (see README, "Temporary deploy on Fly.io").
 # One machine only: the database lives in its memory, so a second machine would have its own data and sessions.
-app = "CHANGE-ME"  # the name from `fly apps create`
+app = "meridian-web-aea"
 primary_region = "ord"
 
 [build]
@@ -14,7 +14,7 @@ primary_region = "ord"
   min_machines_running = 1
 
   [[http_service.checks]]
-    grace_period = "120s"
+    grace_period = "60s"  # Fly caps it at 1 minute
     interval = "30s"
     timeout = "5s"
     method = "GET"

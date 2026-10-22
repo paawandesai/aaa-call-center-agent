@@ -212,7 +212,7 @@ fly secrets set --stage SESSION_SECRET=paste-the-output-of-openssl-rand-hex-32
 fly deploy --ha=false
 ```
 
-The app is then at `https://<name>.fly.dev`. Point a second Better Stack monitor at `/api/health` there. Once Railway deploys work again, redeploy `meridian-web`, then remove the Fly app with `fly apps destroy <name>`.
+If Fly's remote builder can't be reached (it couldn't from a cloud sandbox behind an HTTPS proxy), run `docker build` locally, `fly auth docker`, push to `registry.fly.io/<name>:<tag>` and run `fly deploy --ha=false --image registry.fly.io/<name>:<tag>`. The app is then at `https://<name>.fly.dev`; the 2026-10-22 deploy is `meridian-web-aea`, and on it `/api/staff/ip-check` used `Fly-Client-IP` and ignored made-up `X-Forwarded-For` and `X-Real-IP` headers. Point a second Better Stack monitor at `/api/health` there. Once Railway deploys work again, redeploy `meridian-web`, then remove the Fly app with `fly apps destroy <name>`.
 
 ## Known constraints
 
