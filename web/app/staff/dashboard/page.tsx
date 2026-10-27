@@ -14,6 +14,7 @@ const RANGES: [string, string, number][] = [["24h", "24 h", 1], ["7d", "7 days",
 const INTENDED = new Set(["safety", "adversarial", "billing_account", "cancel_reschedule", "complaint", "human_requested", "service_area_unclear", "out_of_scope"]);
 const fmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const when = (d: Date | string | null) => (d ? fmt.format(new Date(d)) : "never");
+const CLIENT_ERROR_LABEL: Record<string, string> = { render: "page crashed", chunk_load: "script didn't download", script: "file didn't load", unhandled: "uncaught error" };
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ range?: string; demo?: string }> }) {
   if (!(await requireSession("staff"))) redirect("/");
@@ -43,9 +44,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     SELECT to_char(date_trunc('day', ts AT TIME ZONE 'America/Chicago'), 'YYYY-MM-DD') AS day,
       count(*) FILTER (WHERE NOT handed)::int AS contained, count(*) FILTER (WHERE handed)::int AS handed
     FROM c GROUP BY 1 ORDER BY 1`, [days])).rows;
-  const failures = (await q.query<{ ts: Date; session_id: string | null; kind: string; outcome: string; reason: string | null }>(`
-    SELECT ts, session_id, kind, outcome, reason FROM events
-    WHERE ((kind = 'turn' AND (outcome = 'error' OR reason = 'booking_failed')) OR (kind = 'booking' AND outcome <> 'booked') OR kind IN ('rate_limit', 'capacity'))
+  const browserErrors = (await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM events WHERE kind = 'client_error' AND ts > now() - make_interval(days => $1) ${real}`, [days])).rows[0].n;
+  const failures = (await q.query<{ ts: Date; session_id: string | null; kind: string; outcome: string; reason: string | null; name: string | null }>(`
+    SELECT ts, session_id, kind, outcome, reason, meta->>'name' AS name FROM events
+    WHERE ((kind = 'turn' AND (outcome = 'error' OR reason = 'booking_failed')) OR (kind = 'booking' AND outcome <> 'booked') OR kind IN ('rate_limit', 'capacity', 'client_error'))
       AND ts > now() - make_interval(days => $1) ${real}
     ORDER BY ts DESC LIMIT 8`, [days])).rows;
   const health = (await q.query<{ last_reply: Date | null; chunks: number; embed: string | null; last_reset: string | null }>(`
@@ -63,7 +65,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const W = 640, H = 200, base = 180, slot = W / Math.max(perDay.length, 7), bw = Math.min(48, slot * 0.6);
   const y = (n: number) => (n / maxDay) * 160;
   const failKind = (f: (typeof failures)[number]) =>
-    f.kind === "rate_limit" ? ["Rate limit hit", "429"] : f.kind === "capacity" ? ["Daily spend cap reached", "turn refused"] : f.kind === "booking" ? [f.outcome === "slot_taken" ? "Slot taken at confirm" : f.outcome === "cap_reached" ? "Booking cap reached" : "Booking error", f.outcome === "slot_taken" ? "409 · offered next slot" : f.outcome === "cap_reached" ? "429" : "500"]
+    f.kind === "client_error" ? [`Browser error · ${CLIENT_ERROR_LABEL[f.outcome] ?? f.outcome}`, `${f.reason ?? "?"}${f.name ? ` · ${f.name}` : ""}`]
+    : f.kind === "rate_limit" ? ["Rate limit hit", "429"] : f.kind === "capacity" ? ["Daily spend cap reached", "turn refused"] : f.kind === "booking" ? [f.outcome === "slot_taken" ? "Slot taken at confirm" : f.outcome === "cap_reached" ? "Booking cap reached" : "Booking error", f.outcome === "slot_taken" ? "409 · offered next slot" : f.outcome === "cap_reached" ? "429" : "500"]
       : f.reason === "booking_failed" ? ["Booking failed", "handed off"] : ["Model or tool error", "500 · retry offered"];
 
   return (
@@ -87,7 +90,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <div className={`tile${thin ? " thin" : ""}`}><span className="label">Conversations{showDemo ? " (incl. demo)" : ""}</span><span className="value">{k.convs}</span><span className="small muted">{k.turns} turns · chat only (voice is not built)</span></div>
           <div className={`tile${thin ? " thin" : ""}`}><span className="label">Contained (live, unverified)</span><span className="value">{pct(k.convs - k.handed)}</span><span className="small muted">No handoff. The graded number is on <a href="/evaluation">Evaluation</a>.</span></div>
           <div className={`tile${thin ? " thin" : ""}`}><span className="label">Handed off</span><span className="value">{pct(k.handed)}</span><span className="small muted">{waiting} waiting now</span></div>
-          <div className="tile"><span className="label">Failures</span><span className="value">{k.errors + failedBookings}</span><span className="small muted">Model or tool errors, failed bookings</span></div>
+          <div className="tile"><span className="label">Failures</span><span className="value">{k.errors + failedBookings + browserErrors}</span><span className="small muted">Model or tool errors, failed bookings, browser errors ({browserErrors})</span></div>
           <div className="tile"><span className="label">First reply · p50 / p95{showDemo ? " (incl. demo)" : ""}</span><span className="value">{k.p50 != null ? `${(k.p50 / 1000).toFixed(1)}s / ${((k.p95 ?? 0) / 1000).toFixed(1)}s` : "–"}</span><span className="small muted">Time to first streamed word</span></div>
         </div>
 
@@ -167,7 +170,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 ); })}</tbody>
               </table></div>
             )}
-            <span className="small muted">Opaque IDs and status codes only. No message text is logged here.</span>
+            <span className="small muted">Opaque IDs and status codes only. No message text is logged here. Browser errors show the page and error type.</span>
           </section>
         </div>
       </main>
